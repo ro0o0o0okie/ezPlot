@@ -8,7 +8,6 @@
 """
 import os, sys
 import pandas as pd
-import matplotlib.pyplot as plt
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
@@ -304,7 +303,6 @@ def main():
     form = AppForm()
     form.show()
     app.exec_()
-
 
 if __name__ == "__main__":
     main()
