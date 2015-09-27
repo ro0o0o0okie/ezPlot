@@ -6,12 +6,12 @@
 * Created on 9/26/2015
 ******************************
 """
-import os, sys
-import pandas as pd
+import os
+import sys
 
+import pandas as pd
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
-
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
@@ -71,7 +71,7 @@ class AppForm(QMainWindow):
         xLabel = QLabel("&X Axis:")
         self.xSelComboBox = QComboBox()
         self.xSelComboBox.setEditable(False)
-        self.connect(self.xSelComboBox, SIGNAL('currentIndexChanged(int)'), self.update_plot_mpl)
+        self.connect(self.xSelComboBox, SIGNAL('currentIndexChanged(int)'), self.update_plot_data)
         xLabel.setBuddy(self.xSelComboBox)
 
         # self.xSelComboBox.addItems([])
@@ -79,9 +79,15 @@ class AppForm(QMainWindow):
         yLabel = QLabel("&Y Axis:")
         self.ySelList = QListWidget()
         self.ySelList.setSelectionMode(QAbstractItemView.ExtendedSelection) # multiple selection
-        self.connect(self.ySelList, SIGNAL('itemSelectionChanged()'), self.update_plot_mpl)
+        self.connect(self.ySelList, SIGNAL('itemSelectionChanged()'), self.update_plot_data)
         yLabel.setBuddy(self.ySelList)
         # self.ySelList.addItems([])
+
+        lgdLabel = QLabel("Legend:")
+        self.lgdLineEdit= QLineEdit()
+        self.connect(self.lgdLineEdit, SIGNAL('editingFinished()'), self.set_legend)
+        lgdLabel.setBuddy(self.lgdLineEdit)
+        self.lgdLineEdit.setToolTip('Use comma(,) to seperate legend text')
 
         grid = QGridLayout()
         grid.setSpacing(10)
@@ -93,7 +99,10 @@ class AppForm(QMainWindow):
         grid.addWidget(self.xSelComboBox, 2, 1, 1, 2)
 
         grid.addWidget(yLabel, 3, 0)
-        grid.addWidget(self.ySelList, 3, 1, 5, 2)
+        grid.addWidget(self.ySelList, 3, 1, 4, 2)
+
+        grid.addWidget(lgdLabel, 7, 0)
+        grid.addWidget(self.lgdLineEdit, 7, 1, 1, 2)
 
         self.panel_loader.setLayout(grid)
 
@@ -134,14 +143,17 @@ class AppForm(QMainWindow):
                 self.statusBar().showMessage('Read data file failed, see log for details.', 8000)
                 return
 
+            self.dataFrame = None
             colNames = df.columns.tolist()
+
+            self.ySelList.clearSelection()
+            self.ySelList.clear()
+            self.ySelList.addItems(colNames)
 
             self.xSelComboBox.clear()
             self.xSelComboBox.addItems(colNames)
             self.xSelComboBox.setCurrentIndex(0)
 
-            self.ySelList.clear()
-            self.ySelList.addItems(colNames)
             # self.ySelList.setCurrentItem(colNames[0])
 
             self.dataFrame = df
@@ -166,8 +178,11 @@ class AppForm(QMainWindow):
         self.mpl_toolbar = NavigationToolbar(self.canvas, self.panel_fig)
 
         # figure control widgets
-        self.botton_draw = QPushButton("&Redraw")
-        self.connect(self.botton_draw, SIGNAL('clicked()'), self.update_plot_mpl)
+        self.botton_draw = QPushButton("&Plot")
+        self.connect(self.botton_draw, SIGNAL('clicked()'), self.update_plot_data)
+
+        self.chkbox_clear = QCheckBox("&Clear")
+        self.chkbox_clear.setChecked(True)
 
         self.chkbox_grid = QCheckBox("&Grid")
         self.chkbox_grid.setChecked(True)
@@ -188,7 +203,8 @@ class AppForm(QMainWindow):
         sliderLabel.setBuddy(self.slider_fontsz)
 
         hbox = QHBoxLayout()
-        for w in [self.botton_draw, self.chkbox_grid, self.chkbox_legend, sliderLabel, self.slider_fontsz]:
+        for w in [self.botton_draw, self.chkbox_clear, self.chkbox_grid, self.chkbox_legend,
+                  sliderLabel, self.slider_fontsz]:
             hbox.addWidget(w)
             # hbox.setAlignment(w, Qt.AlignVCenter)
 
@@ -200,11 +216,10 @@ class AppForm(QMainWindow):
         self.panel_fig.setLayout(vbox)
 
 
-    def update_plot_mpl(self):
+    def update_plot_data(self):
         self.xColName = unicode(self.xSelComboBox.currentText())
-        # self.yColName = list(self.ySelList.selectedItems())
-        self.yColNames = [unicode(item.text())
-                         for item in self.ySelList.selectedItems()]
+        self.yColNames = [ unicode(item.text())
+                         for item in self.ySelList.selectedItems() ]
 
         if self.xColName in self.yColNames:
             self.yColNames.remove(self.xColName)
@@ -213,41 +228,55 @@ class AppForm(QMainWindow):
             self.plot_mpl()
 
 
-    def plot_mpl(self, clear=True):
+    def plot_mpl(self):
         """ Redraws the figure
         """
         if self.dataFrame is None or len(self.yColNames)==0:
             self.statusBar().showMessage('Nothing to plot', 2000)
             return
 
-        if clear: # clear the axes and redraw the plot anew
+        if self.chkbox_clear.isChecked(): # clear the axes and redraw the plot anew
             self.axes.clear()
 
         fontSz = self.slider_fontsz.value()
-        lgndOn = self.chkbox_legend.isChecked()
+        legnON = self.chkbox_legend.isChecked()
         ax = self.dataFrame.plot(x=self.xColName, y=self.yColNames,
                             ax=self.axes,
                             fontsize=fontSz,
                             grid=self.chkbox_grid.isChecked(),
-                            legend=lgndOn)
+                            legend=legnON)
+
+        # ax.patch.set_alpha(0)
 
         # axis label font size
         for item in [ax.title, ax.xaxis.label, ax.yaxis.label]:
             item.set_fontsize(fontSz)
 
-        if lgndOn: # legend font & transparency
+        if legnON: # legend font & transparency
             ax.legend(borderpad=0.2, labelspacing=0.2, framealpha=0.8, fontsize=fontSz)
-
-        lgnd = ax.get_legend()
-        if lgnd is not None: lgnd.draggable(True)
+            legn = ax.get_legend()
+            if legn is not None: legn.draggable(True)
 
         self.canvas.draw()
+
+
+    def set_legend(self):
+        ''' set legend from custom input text, seperated by comma'''
+        legnStr = unicode(self.lgdLineEdit.text())
+        if len(legnStr)>0:
+            legn = self.axes.get_legend()
+            if legn is not None:
+                for lt, ls in zip(legn.get_texts(), legnStr.split(',')):
+                    lt.set_text(ls)
+                self.canvas.draw() # refresh
+                self.statusBar().showMessage('Legend updated', 2000)
 
 
     def save_plot(self):
         path = unicode(QFileDialog.getSaveFileName(self, 'Save Image', '', "PNG (*.png)|*.png"))
         if path:
-            self.canvas.print_figure(path, dpi=300)
+            # self.canvas.print_figure(path, dpi=300, transparent=True)
+            self.fig.savefig(path, dpi=300, bbox_inches='tight', transparent=True, pad_inches=0.2)
             self.statusBar().showMessage('Saved to %s' % path, 2000)
 
     # =====================================================================
