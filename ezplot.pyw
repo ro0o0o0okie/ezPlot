@@ -42,7 +42,7 @@ class AppForm(QMainWindow):
         self.main_frame.setStretchFactor(1, 4)
 
         status = self.statusBar()
-        status.setSizeGripEnabled(False)
+        status.setSizeGripEnabled(True)
         status.showMessage("Ready", 5000)
 
 
@@ -273,7 +273,8 @@ class AppForm(QMainWindow):
 
 
     def save_plot(self):
-        path = unicode(QFileDialog.getSaveFileName(self, 'Save Image', '', "PNG (*.png)|*.png"))
+        path = unicode(QFileDialog.getSaveFileName(self, 'Save Image', '',
+                                                   "Image files (*.png *.pdf *.jpg *.tif *.tiff)"))
         if path:
             # self.canvas.print_figure(path, dpi=300, transparent=True)
             self.fig.savefig(path, dpi=300, bbox_inches='tight', transparent=True, pad_inches=0.2)
