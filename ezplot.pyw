@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-******************************             
+******************************
 * Filename: ezplot.pyw
 * Author: RayN
 * Created on 9/26/2015
@@ -12,15 +12,48 @@ import sys
 import pandas as pd
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
+import matplotlib as mpl
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-unicode = str # for python 3
+if sys.version_info >= (3, 0):
+    unicode = str # for python 3
 
 __appname__ = 'ezPlot'
 __version__ = "1.0.0"
 __author__  = 'RayN'
+
+def SetPlotStyle(figsize=(4.8,3.6)):
+    """ Set MPL plot paprameters """
+    mpl.use('Qt4Agg')
+    mpl.rcParams['font.sans-serif'] = ['SimHei'] # 指定默认字体
+    mpl.rcParams['axes.unicode_minus'] = False # 解决保存图像是负号'-'显示为方块的问题
+
+    # mpl.rcParams['figure.figsize'] = figsize # [8, 6] # inch
+    # mpl.rcParams['figure.dpi'] = 100 # dots per inch
+
+    # mpl.rcParams['savefig.dpi'] = 300
+    # mpl.rcParams['savefig.bbox'] = 'tight'
+    # mpl.rcParams['savefig.pad_inches'] = 0.0
+
+    # mpl.rcParams['font.family'] = 'serif'
+    # mpl.rcParams['font.size'] = 12
+
+    # mpl.rcParams['legend.fontsize'] = 12
+    # mpl.rcParams['legend.fancybox'] = True
+    #
+    mpl.rcParams['lines.linewidth'] = 1.2
+    mpl.rcParams['lines.markersize'] = 5
+    #
+    # mpl.rcParams['axes.grid'] = False
+
+    # mpl.rcParams['text.usetex'] = False
+    # color cycle for plot lines
+    mpl.rcParams['axes.color_cycle'] = \
+    ['#348ABD', '#A60628', '#7A68A6', '#467821',
+     '#D55E00', '#CC79A7', '#56B4E9', '#009E73', '#F0E442', '#0072B2']
+
 
 class AppForm(QMainWindow):
     def __init__(self, parent=None):
@@ -165,6 +198,7 @@ class AppForm(QMainWindow):
     # =====================================================================
     def create_figure_mpl(self, figSize=(5,4), figDPI=100):
         ''' create matplotlib figure panel '''
+        SetPlotStyle()
         self.panel_fig = QWidget()
 
         # Create the mpl Figure and FigCanvas objects.
@@ -328,7 +362,9 @@ class AppForm(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName(__appname__)
-    app.setWindowIcon(QIcon(r"./icon.png"))
+
+    curFd = os.path.dirname(os.path.realpath(__file__))
+    app.setWindowIcon(QIcon(os.path.join(curFd, 'icons', 'logo.png')))
 
     form = AppForm()
     form.show()

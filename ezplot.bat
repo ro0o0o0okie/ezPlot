@@ -1,0 +1,1 @@
+activate py34 && pythonw ezplot.pyw
