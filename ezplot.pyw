@@ -26,7 +26,8 @@ __author__  = 'RayN'
 
 def SetPlotStyle():
     """ Set MPL plot paprameters """
-    style.use('seaborn-paper')
+    style.use('bmh')
+    # style.use('seaborn-paper')
     # style.use('fivethirtyeight')
     # cn_font_prop = fontm.FontProperties(fname=settings.FILE_FIGURE_FONT, size=9) # fix legend CN issue
     # mpl.use('Qt5Agg')
@@ -159,7 +160,7 @@ class AppForm(QtWidgets.QMainWindow):
 
         fnLabel = QtWidgets.QLabel("  &Data:")
         self.datFnLineEdit = QtWidgets.QLineEdit()
-        self.datFnLineEdit.setMinimumWidth(100)
+        self.datFnLineEdit.setMinimumWidth(200)
         # self.connect(self.datFnLineEdit, SIGNAL('editingFinished()'), self.file_load)
         self.datFnLineEdit.editingFinished.connect(self.file_load)
         fnLabel.setBuddy(self.datFnLineEdit)
@@ -292,7 +293,7 @@ class AppForm(QtWidgets.QMainWindow):
         self.chkbox_legend = QtWidgets.QCheckBox("&Legend")
         self.chkbox_legend.setChecked(True)
         
-        self.edit_fontsz = Float(low=6, high=64, step=1.0, digits=1, default=10, label="FontSize")
+        self.edit_fontsz = Float(low=6, high=64, step=1.0, digits=1, default=11, label="FontSize")
         self.edit_fontsz.valueChanged.connect(self.plot_mpl)
         self.edit_fig_width = Float(low=0, high=64, step=0.01, digits=3, default=0, label="FigWidth")
         self.edit_fig_height = Float(low=0, high=64, step=0.01, digits=3, default=0, label="FigHeight")
