@@ -8,27 +8,35 @@
 """
 import os
 import sys
-
 import pandas as pd
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
 import matplotlib as mpl
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+# mpl.use('Qt5Agg')
+print(mpl.get_backend())
+
+
+from matplotlib import style
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-if sys.version_info >= (3, 0):
-    unicode = str # for python 3
+from PyQt5 import QtCore, QtWidgets, QtGui
 
-__appname__ = 'ezPlot'
-__version__ = "1.0.0"
+
+__appname__ = 'EzPlot'
+__version__ = "2.0.0"
 __author__  = 'RayN'
+
 
 def SetPlotStyle(figsize=(4.8,3.6)):
     """ Set MPL plot paprameters """
-    mpl.use('Qt4Agg')
-    mpl.rcParams['font.sans-serif'] = ['SimHei'] # 指定默认字体
-    mpl.rcParams['axes.unicode_minus'] = False # 解决保存图像是负号'-'显示为方块的问题
+    # style.use('seaborn-paper')
+    # style.use('fivethirtyeight')
+    # cn_font_prop = fontm.FontProperties(fname=settings.FILE_FIGURE_FONT, size=9) # fix legend CN issue
+    # mpl.use('Qt5Agg')
+    # mpl.rcParams['font.family'] = 'serif'
+    # mpl.rcParams['font.sans-serif'] = ['SimHei'] # 指定默认字体
+    # mpl.rcParams['font.serif'] = ['Times', 'SimHei'] # 指定默认字体
+    # mpl.rcParams['axes.unicode_minus'] = False # 解决保存图像是负号'-'显示为方块的问题
 
     # mpl.rcParams['figure.figsize'] = figsize # [8, 6] # inch
     # mpl.rcParams['figure.dpi'] = 100 # dots per inch
@@ -50,23 +58,67 @@ def SetPlotStyle(figsize=(4.8,3.6)):
 
     # mpl.rcParams['text.usetex'] = False
     # color cycle for plot lines
-    mpl.rcParams['axes.color_cycle'] = \
-    ['#348ABD', '#A60628', '#7A68A6', '#467821',
-     '#D55E00', '#CC79A7', '#56B4E9', '#009E73', '#F0E442', '#0072B2']
+    # mpl.rcParams['axes.color_cycle'] = \
+    # ['#348ABD', '#A60628', '#7A68A6', '#467821',
+    #  '#D55E00', '#CC79A7', '#56B4E9', '#009E73', '#F0E442', '#0072B2']
 
 
-class AppForm(QMainWindow):
+class Float(QtWidgets.QDoubleSpinBox):
+    def __init__(self, low, high, step, digits=3, default=None,
+                 prefix=None, suffix=None, readonly=False, minWidth=50, label="Float", tooltip=None):
+        super(Float, self).__init__()
+        self.labelText = QtWidgets.QLabel(label+':')
+        self.default = default if default is not None else low # use 'low' as default if not given
+        self.setRange(low, high)
+        self.setSingleStep(step)
+        self.setDecimals(digits)
+        self.setDefault()
+        if prefix is not None : self.setPrefix(prefix)
+        if suffix is not None : self.setSuffix(suffix)
+        if readonly : self.enable(False) # self.setReadOnly(True)
+        if tooltip  : self.setToolTip(tooltip)
+        self.setMinimumWidth(minWidth)
+        self.setFocusPolicy(QtCore.Qt.StrongFocus) # diable wheel focus
+
+    def wheelEvent(self, event):
+        """ overide default wheel envent to prevent accidently changing value by scrolling.
+        """
+        pass
+
+    def setDefault(self):
+        """ reset to default value. """
+        self.setValue(self.default)
+
+    def getValue(self):
+        return float(self.value())
+
+    def getLimit(self):
+        """ widget min & max limit """
+        return self.minimum(), self.maximum()
+
+    def enable(self, bool):
+        self.setEnabled(bool)
+        self.labelText.setEnabled(bool)
+
+    def disable(self, bool):
+        self.setDisabled(bool)
+        self.labelText.setDisabled(bool)
+        
+
+
+class AppForm(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         super(AppForm, self).__init__(parent)
-        self.setWindowTitle(__appname__ +'  ver.'+__version__)
-        self.resize(900, 600)
+        self.setStyleSheet('font-size: 10pt; font-family: microsoft yahei;') # overide font
+        self.setWindowTitle(__appname__ +'  v'+__version__ + '  by ' + __author__)
+        self.resize(1200, 800)
         self.center()
 
         self.create_menu()
         self.create_loader()
         self.create_figure_mpl(figSize=(5,4), figDPI=120)
 
-        self.main_frame = QSplitter(Qt.Horizontal)
+        self.main_frame = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         self.main_frame.addWidget(self.panel_loader)
         self.main_frame.addWidget(self.panel_fig)
         self.setCentralWidget(self.main_frame)
@@ -74,55 +126,72 @@ class AppForm(QMainWindow):
         self.main_frame.setStretchFactor(0, 1)
         self.main_frame.setStretchFactor(1, 4)
 
+        # zp = ZoomPan() # setup mouse zoom & pan
+        # for ax in [self.axes]:
+        #     zp.zoom_factory(ax, base_scale = 1.01)
+        #     zp.pan_factory(ax)
+        
         status = self.statusBar()
         status.setSizeGripEnabled(True)
         status.showMessage("Ready", 5000)
 
-
+    
+    
+    def resizeEvent(self, event):
+        # update fig size text when resized
+        fsize = self.fig.get_size_inches()
+        self.set_figure_size_editor(fsize[0],fsize[1])
+    
+    
     def center(self):
         qr = self.frameGeometry()
-        cp = QDesktopWidget().availableGeometry().center()
+        cp = QtWidgets.QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
 
     # =====================================================================
     def create_loader(self):
         ''' create data file loader panel '''
-        self.panel_loader = QWidget()
+        self.panel_loader = QtWidgets.QWidget()
         # init dataFrame
         self.dataFrame = None
 
-        fnLabel = QLabel("  &Data:")
-        self.datFnLineEdit = QLineEdit()
+        fnLabel = QtWidgets.QLabel("  &Data:")
+        self.datFnLineEdit = QtWidgets.QLineEdit()
         self.datFnLineEdit.setMinimumWidth(100)
-        self.connect(self.datFnLineEdit, SIGNAL('editingFinished()'), self.file_load)
+        # self.connect(self.datFnLineEdit, SIGNAL('editingFinished()'), self.file_load)
+        self.datFnLineEdit.editingFinished.connect(self.file_load)
         fnLabel.setBuddy(self.datFnLineEdit)
 
-        self.botton_open = QPushButton("&Open")
-        self.connect(self.botton_open, SIGNAL('clicked()'), self.file_open)
+        self.botton_open = QtWidgets.QPushButton("&Open")
+        # self.connect(self.botton_open, SIGNAL('clicked()'), self.file_open)
+        self.botton_open.clicked.connect(self.file_open)
 
-        xLabel = QLabel("&X Axis:")
-        self.xSelComboBox = QComboBox()
+        xLabel = QtWidgets.QLabel("&X Axis:")
+        self.xSelComboBox = QtWidgets.QComboBox()
         self.xSelComboBox.setEditable(False)
-        self.connect(self.xSelComboBox, SIGNAL('currentIndexChanged(int)'), self.update_plot_data)
+        # self.connect(self.xSelComboBox, SIGNAL('currentIndexChanged(int)'), self.update_plot_data)
+        self.xSelComboBox.currentIndexChanged.connect(self.update_plot_data)
         xLabel.setBuddy(self.xSelComboBox)
 
         # self.xSelComboBox.addItems([])
 
-        yLabel = QLabel("&Y Axis:")
-        self.ySelList = QListWidget()
-        self.ySelList.setSelectionMode(QAbstractItemView.ExtendedSelection) # multiple selection
-        self.connect(self.ySelList, SIGNAL('itemSelectionChanged()'), self.update_plot_data)
+        yLabel = QtWidgets.QLabel("&Y Axis:")
+        self.ySelList = QtWidgets.QListWidget()
+        self.ySelList.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection) # multiple selection
+        # self.connect(self.ySelList, SIGNAL('itemSelectionChanged()'), self.update_plot_data)
+        self.ySelList.itemSelectionChanged.connect(self.update_plot_data)
         yLabel.setBuddy(self.ySelList)
         # self.ySelList.addItems([])
 
-        lgdLabel = QLabel("Legend:")
-        self.lgdLineEdit= QLineEdit()
-        self.connect(self.lgdLineEdit, SIGNAL('editingFinished()'), self.set_legend)
+        lgdLabel = QtWidgets.QLabel("Legend:")
+        self.lgdLineEdit= QtWidgets.QLineEdit()
+        # self.connect(self.lgdLineEdit, SIGNAL('editingFinished()'), self.set_legend)
+        self.lgdLineEdit.editingFinished.connect(self.set_legend)
         lgdLabel.setBuddy(self.lgdLineEdit)
         self.lgdLineEdit.setToolTip('Use comma(,) to seperate legend text')
 
-        grid = QGridLayout()
+        grid = QtWidgets.QGridLayout()
         grid.setSpacing(10)
         grid.addWidget(fnLabel, 1, 0)
         grid.addWidget(self.datFnLineEdit, 1, 1)
@@ -142,23 +211,21 @@ class AppForm(QMainWindow):
 
     def file_open(self):
         try: # use current date path as default open dir
-            curDir = os.path.split(unicode(self.datFnLineEdit.text()))[0]
+            curDir = os.path.split(str(self.datFnLineEdit.text()))[0]
         except:
             curDir = ''
 
-        datPath = QFileDialog.getOpenFileName(
+        datPath = QtWidgets.QFileDialog.getOpenFileName(
             self, 'Select File', curDir, "Data files (*.csv *.pkl)")
 
-        if datPath=="": # canceled
-            return
-        else:
-            self.datFnLineEdit.setText(datPath)
+        if datPath: # canceled
+            self.datFnLineEdit.setText(str(datPath[0]))
             self.file_load()
 
 
     def file_load(self):
         # load data into dataFrame
-        datPath = unicode(self.datFnLineEdit.text())
+        datPath = str(self.datFnLineEdit.text())
         if os.path.exists(datPath):
             fType = datPath.split('.')[-1]
             if fType=='csv':
@@ -199,11 +266,11 @@ class AppForm(QMainWindow):
     def create_figure_mpl(self, figSize=(5,4), figDPI=100):
         ''' create matplotlib figure panel '''
         SetPlotStyle()
-        self.panel_fig = QWidget()
+        self.panel_fig = QtWidgets.QWidget()
 
         # Create the mpl Figure and FigCanvas objects.
         self.fig = Figure(figSize, dpi=figDPI)
-        self.canvas = FigureCanvas(self.fig)
+        self.canvas = FigureCanvas(figure=self.fig)
         self.canvas.setParent(self.panel_fig)
 
         self.axes = self.fig.add_subplot(111)
@@ -212,47 +279,70 @@ class AppForm(QMainWindow):
         self.mpl_toolbar = NavigationToolbar(self.canvas, self.panel_fig)
 
         # figure control widgets
-        self.botton_draw = QPushButton("&Plot")
-        self.connect(self.botton_draw, SIGNAL('clicked()'), self.update_plot_data)
-
-        self.chkbox_clear = QCheckBox("&Clear")
+        self.botton_draw = QtWidgets.QPushButton("&Plot")
+        # self.connect(self.botton_draw, SIGNAL('clicked()'), self.update_plot_data)
+        self.botton_draw.clicked.connect(self.update_plot_data)
+        
+        self.chkbox_clear = QtWidgets.QCheckBox("&Clear")
         self.chkbox_clear.setChecked(True)
 
-        self.chkbox_grid = QCheckBox("&Grid")
+        self.chkbox_grid = QtWidgets.QCheckBox("&Grid")
         self.chkbox_grid.setChecked(True)
         # self.connect(self.chkbox_grid, SIGNAL('stateChanged(int)'), self.plot_mpl)
 
-        self.chkbox_legend = QCheckBox("&Legend")
+        self.chkbox_legend = QtWidgets.QCheckBox("&Legend")
         self.chkbox_legend.setChecked(True)
         # self.connect(self.chkbox_legend, SIGNAL('stateChanged(int)'), self.plot_mpl)
 
-        self.slider_fontsz = QSlider(Qt.Horizontal)
-        self.slider_fontsz.setRange(5, 50)
+        self.slider_fontsz = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.slider_fontsz.setRange(6, 36)
         self.slider_fontsz.setValue(10)
-        self.slider_fontsz.setTickInterval(5)
-        self.slider_fontsz.setTickPosition(QSlider.TicksBothSides)
+        self.slider_fontsz.setTickInterval(2)
+        self.slider_fontsz.setTickPosition(QtWidgets.QSlider.TicksBothSides)
         self.slider_fontsz.setTracking(True)
-        self.connect(self.slider_fontsz, SIGNAL('valueChanged(int)'), self.plot_mpl)
-        sliderLabel = QLabel('&Font Size:')
-        sliderLabel.setBuddy(self.slider_fontsz)
-
-        hbox = QHBoxLayout()
-        for w in [self.botton_draw, self.chkbox_clear, self.chkbox_grid, self.chkbox_legend,
-                  sliderLabel, self.slider_fontsz]:
-            hbox.addWidget(w)
+        self.slider_fontsz.valueChanged.connect(self.plot_mpl)
+        updateToolTip = lambda s : self.slider_fontsz.setToolTip(str(s))
+        self.slider_fontsz.valueChanged.connect(updateToolTip)
+        sliderFontszLabel = QtWidgets.QLabel('&FontSize:')
+        sliderFontszLabel.setBuddy(self.slider_fontsz)
+        
+        self.edit_fig_width = Float(low=0, high=16, step=0.01, digits=3, default=0, label="FigWidth")
+        self.edit_fig_height = Float(low=0, high=16, step=0.01, digits=3, default=0, label="FigHeight")
+        
+        hbox1 = QtWidgets.QHBoxLayout()
+        hbox2 = QtWidgets.QHBoxLayout()
+        for w in [sliderFontszLabel, self.slider_fontsz, 
+                  self.edit_fig_width.labelText, self.edit_fig_width, 
+                  self.edit_fig_height.labelText, self.edit_fig_height ]:
+            hbox1.addWidget(w)
+        for w in [self.botton_draw, self.chkbox_clear, self.chkbox_grid, self.chkbox_legend]:
+            hbox2.addWidget(w)
             # hbox.setAlignment(w, Qt.AlignVCenter)
-
-        vbox = QVBoxLayout()
+        
+        vbox = QtWidgets.QVBoxLayout()
         vbox.addWidget(self.canvas)
         vbox.addWidget(self.mpl_toolbar)
-        vbox.addLayout(hbox)
+        vbox.addLayout(hbox1)
+        vbox.addLayout(hbox2)
 
         self.panel_fig.setLayout(vbox)
-
+    
+    
+    
+    # def update_figure_mpl(self, figSize=(5,4), figDPI=100):
+    #     ''' create matplotlib figure panel '''
+    #     # Create the mpl Figure and FigCanvas objects.
+    #     # self.fig.clear()
+    #     self.fig = Figure(figSize, dpi=figDPI)
+    #     self.canvas = FigureCanvas(figure=self.fig)
+    #     self.canvas.setParent(self.panel_fig)
+    #     self.axes = self.fig.add_subplot(111)
+    #     self.mpl_toolbar = NavigationToolbar(self.canvas, self.panel_fig)
+    
 
     def update_plot_data(self):
-        self.xColName = unicode(self.xSelComboBox.currentText())
-        self.yColNames = [ unicode(item.text())
+        self.xColName = str(self.xSelComboBox.currentText())
+        self.yColNames = [ str(item.text())
                          for item in self.ySelList.selectedItems() ]
 
         if self.xColName in self.yColNames:
@@ -261,7 +351,12 @@ class AppForm(QMainWindow):
         if len(self.yColNames)>0:
             self.plot_mpl()
 
-
+    
+    def set_figure_size_editor(self, w, h):
+        self.edit_fig_width.setValue(w)
+        self.edit_fig_height.setValue(h)
+        
+    
     def plot_mpl(self):
         """ Redraws the figure
         """
@@ -271,9 +366,18 @@ class AppForm(QMainWindow):
 
         if self.chkbox_clear.isChecked(): # clear the axes and redraw the plot anew
             self.axes.clear()
-
+        
         fontSz = self.slider_fontsz.value()
         legnON = self.chkbox_legend.isChecked()
+        
+        customFigW = self.edit_fig_width.getValue()
+        customFigH = self.edit_fig_height.getValue()            
+        currentFigSize = self.fig.get_size_inches()
+        if customFigW==0 or customFigH==0: # fig size not given, init to current fig size
+            self.set_figure_size_editor(currentFigSize[0], currentFigSize[1])
+        elif currentFigSize[0]!=customFigW or currentFigSize[1]!=customFigH: # set to custom fig size
+            self.fig.set_size_inches(self.edit_fig_width.getValue(), self.edit_fig_height.getValue(), forward=True)
+        
         ax = self.dataFrame.plot(x=self.xColName, y=self.yColNames,
                             ax=self.axes,
                             fontsize=fontSz,
@@ -296,7 +400,7 @@ class AppForm(QMainWindow):
 
     def set_legend(self):
         ''' set legend from custom input text, seperated by comma'''
-        legnStr = unicode(self.lgdLineEdit.text())
+        legnStr = str(self.lgdLineEdit.text())
         if len(legnStr)>0:
             legn = self.axes.get_legend()
             if legn is not None:
@@ -307,8 +411,8 @@ class AppForm(QMainWindow):
 
 
     def save_plot(self):
-        path = unicode(QFileDialog.getSaveFileName(self, 'Save Image', '',
-                                                   "Image files (*.png *.pdf *.jpg *.tif *.tiff)"))
+        path = str(QtWidgets.QFileDialog.getSaveFileName(self, 'Save Image', '',
+                                                   "Image files (*.png *.eps *.pdf *.jpg *.tif *.tiff)"))
         if path:
             # self.canvas.print_figure(path, dpi=300, transparent=True)
             self.fig.savefig(path, dpi=300, bbox_inches='tight', transparent=True, pad_inches=0.2)
@@ -329,18 +433,18 @@ class AppForm(QMainWindow):
         self.add_actions(helpMenu, (action_about,))
 
 
-    def create_action(self, text, slot=None, shortcut=None, icon=None,
-                                    tip=None, checkable=False, signal="triggered()"):
-        action = QAction(text, self)
+    def create_action(self, text, slot=None, shortcut=None, icon=None, tip=None, checkable=False):
+        action = QtWidgets.QAction(text, self)
         if icon is not None:
-            action.setIcon(QIcon("./%s.png" % icon))
+            action.setIcon(QtGui.QIcon("./%s.png" % icon))
         if shortcut is not None:
             action.setShortcut(shortcut)
         if tip is not None:
             action.setToolTip(tip)
             action.setStatusTip(tip)
         if slot is not None:
-            self.connect(action, SIGNAL(signal), slot)
+            # self.connect(action, SIGNAL(signal), slot)
+            action.triggered.connect(slot)
         if checkable:
             action.setCheckable(True)
         return action
@@ -355,16 +459,16 @@ class AppForm(QMainWindow):
 
 
     def on_about(self):
-        msg = """ A very simple data plot tool based on PyQT. """
-        QMessageBox.about(self, "About the demo", msg.strip())
+        msg = """ A very simple data plot tool based on PyQT & matplotlib.\nAuthor: RayN"""
+        QtWidgets.QMessageBox.about(self, "About the app", msg.strip())
 
 
 def main():
-    app = QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName(__appname__)
 
     curFd = os.path.dirname(os.path.realpath(__file__))
-    app.setWindowIcon(QIcon(os.path.join(curFd, 'icons', 'logo.png')))
+    app.setWindowIcon(QtGui.QIcon(os.path.join(curFd, 'icons', 'logo.png')))
 
     form = AppForm()
     form.show()
