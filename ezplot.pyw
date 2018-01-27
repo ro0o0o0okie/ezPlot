@@ -10,9 +10,6 @@ import os
 import sys
 import pandas as pd
 import matplotlib as mpl
-# mpl.use('Qt5Agg')
-print(mpl.get_backend())
-
 
 from matplotlib import style
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -27,15 +24,15 @@ __version__ = "2.0.0"
 __author__  = 'RayN'
 
 
-def SetPlotStyle(figsize=(4.8,3.6)):
+def SetPlotStyle():
     """ Set MPL plot paprameters """
-    # style.use('seaborn-paper')
+    style.use('seaborn-paper')
     # style.use('fivethirtyeight')
     # cn_font_prop = fontm.FontProperties(fname=settings.FILE_FIGURE_FONT, size=9) # fix legend CN issue
     # mpl.use('Qt5Agg')
     # mpl.rcParams['font.family'] = 'serif'
     # mpl.rcParams['font.sans-serif'] = ['SimHei'] # 指定默认字体
-    # mpl.rcParams['font.serif'] = ['Times', 'SimHei'] # 指定默认字体
+    # mpl.rcParams['font.serif'] = ['Times'] # 指定默认字体
     # mpl.rcParams['axes.unicode_minus'] = False # 解决保存图像是负号'-'显示为方块的问题
 
     # mpl.rcParams['figure.figsize'] = figsize # [8, 6] # inch
@@ -51,8 +48,8 @@ def SetPlotStyle(figsize=(4.8,3.6)):
     # mpl.rcParams['legend.fontsize'] = 12
     # mpl.rcParams['legend.fancybox'] = True
     #
-    mpl.rcParams['lines.linewidth'] = 1.2
-    mpl.rcParams['lines.markersize'] = 5
+    # mpl.rcParams['lines.linewidth'] = 1.2
+    # mpl.rcParams['lines.markersize'] = 5
     #
     # mpl.rcParams['axes.grid'] = False
 
@@ -136,6 +133,10 @@ class AppForm(QtWidgets.QMainWindow):
         status.showMessage("Ready", 5000)
 
     
+    def showEvent(self, event):
+        # update fig size text when show
+        fsize = self.fig.get_size_inches()
+        self.set_figure_size_editor(fsize[0],fsize[1])
     
     def resizeEvent(self, event):
         # update fig size text when resized
@@ -280,7 +281,6 @@ class AppForm(QtWidgets.QMainWindow):
 
         # figure control widgets
         self.botton_draw = QtWidgets.QPushButton("&Plot")
-        # self.connect(self.botton_draw, SIGNAL('clicked()'), self.update_plot_data)
         self.botton_draw.clicked.connect(self.update_plot_data)
         
         self.chkbox_clear = QtWidgets.QCheckBox("&Clear")
@@ -288,32 +288,20 @@ class AppForm(QtWidgets.QMainWindow):
 
         self.chkbox_grid = QtWidgets.QCheckBox("&Grid")
         self.chkbox_grid.setChecked(True)
-        # self.connect(self.chkbox_grid, SIGNAL('stateChanged(int)'), self.plot_mpl)
 
         self.chkbox_legend = QtWidgets.QCheckBox("&Legend")
         self.chkbox_legend.setChecked(True)
-        # self.connect(self.chkbox_legend, SIGNAL('stateChanged(int)'), self.plot_mpl)
-
-        self.slider_fontsz = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self.slider_fontsz.setRange(6, 36)
-        self.slider_fontsz.setValue(10)
-        self.slider_fontsz.setTickInterval(2)
-        self.slider_fontsz.setTickPosition(QtWidgets.QSlider.TicksBothSides)
-        self.slider_fontsz.setTracking(True)
-        self.slider_fontsz.valueChanged.connect(self.plot_mpl)
-        updateToolTip = lambda s : self.slider_fontsz.setToolTip(str(s))
-        self.slider_fontsz.valueChanged.connect(updateToolTip)
-        sliderFontszLabel = QtWidgets.QLabel('&FontSize:')
-        sliderFontszLabel.setBuddy(self.slider_fontsz)
         
-        self.edit_fig_width = Float(low=0, high=16, step=0.01, digits=3, default=0, label="FigWidth")
-        self.edit_fig_height = Float(low=0, high=16, step=0.01, digits=3, default=0, label="FigHeight")
+        self.edit_fontsz = Float(low=6, high=64, step=1.0, digits=1, default=10, label="FontSize")
+        self.edit_fontsz.valueChanged.connect(self.plot_mpl)
+        self.edit_fig_width = Float(low=0, high=64, step=0.01, digits=3, default=0, label="FigWidth")
+        self.edit_fig_height = Float(low=0, high=64, step=0.01, digits=3, default=0, label="FigHeight")
         
         hbox1 = QtWidgets.QHBoxLayout()
         hbox2 = QtWidgets.QHBoxLayout()
-        for w in [sliderFontszLabel, self.slider_fontsz, 
-                  self.edit_fig_width.labelText, self.edit_fig_width, 
-                  self.edit_fig_height.labelText, self.edit_fig_height ]:
+        for w in [self.edit_fontsz.labelText, self.edit_fontsz,
+                  self.edit_fig_width.labelText, self.edit_fig_width,
+                  self.edit_fig_height.labelText, self.edit_fig_height]:
             hbox1.addWidget(w)
         for w in [self.botton_draw, self.chkbox_clear, self.chkbox_grid, self.chkbox_legend]:
             hbox2.addWidget(w)
@@ -326,18 +314,6 @@ class AppForm(QtWidgets.QMainWindow):
         vbox.addLayout(hbox2)
 
         self.panel_fig.setLayout(vbox)
-    
-    
-    
-    # def update_figure_mpl(self, figSize=(5,4), figDPI=100):
-    #     ''' create matplotlib figure panel '''
-    #     # Create the mpl Figure and FigCanvas objects.
-    #     # self.fig.clear()
-    #     self.fig = Figure(figSize, dpi=figDPI)
-    #     self.canvas = FigureCanvas(figure=self.fig)
-    #     self.canvas.setParent(self.panel_fig)
-    #     self.axes = self.fig.add_subplot(111)
-    #     self.mpl_toolbar = NavigationToolbar(self.canvas, self.panel_fig)
     
 
     def update_plot_data(self):
@@ -367,7 +343,7 @@ class AppForm(QtWidgets.QMainWindow):
         if self.chkbox_clear.isChecked(): # clear the axes and redraw the plot anew
             self.axes.clear()
         
-        fontSz = self.slider_fontsz.value()
+        fontSz = self.edit_fontsz.value()
         legnON = self.chkbox_legend.isChecked()
         
         customFigW = self.edit_fig_width.getValue()
