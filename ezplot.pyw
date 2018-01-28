@@ -78,8 +78,8 @@ class EzPlot(QtWidgets.QMainWindow):
     def __init__(self, config:dict=None):
         super(EzPlot, self).__init__()
         self.config = {
-            'SplitterState' : None,
             'WindowSize' : (1200, 800),
+            'SplitterState' : None,
             'DataFile' : None,
             'Style' : 'default',
             'FigWidth' : 5, 'FigHeight' : 4, 
@@ -118,8 +118,8 @@ class EzPlot(QtWidgets.QMainWindow):
     
     def saveConfig(self, fn):
         self.config = {
-            'SplitterState' : str(self.main_frame.saveState().toHex(), encoding='ascii'),
             'WindowSize'    : (self.frameGeometry().width(), self.frameGeometry().height()),
+            'SplitterState' : str(self.main_frame.saveState().toHex(), encoding='ascii'),
             'DataFile'      : self.datafile.getValue(),
             'Style'         : self.combo_style.getValue(),
             'FigWidth'      : self.edit_fig_width.getValue(), 
