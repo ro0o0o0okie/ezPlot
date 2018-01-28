@@ -78,6 +78,7 @@ class EzPlot(QtWidgets.QMainWindow):
     def __init__(self, config:dict=None):
         super(EzPlot, self).__init__()
         self.config = {
+            'SplitterState' : None,
             'WindowSize' : (1200, 800),
             'DataFile' : None,
             'Style' : 'default',
@@ -101,9 +102,14 @@ class EzPlot(QtWidgets.QMainWindow):
         self.main_frame.addWidget(self.panel_loader)
         self.main_frame.addWidget(self.panel_figure)
         self.setCentralWidget(self.main_frame)
-
-        self.main_frame.setStretchFactor(0, 1)
-        self.main_frame.setStretchFactor(1, 4)
+        
+        stateStr = self.config['SplitterState']
+        if stateStr is not None:
+            state = QtCore.QByteArray().fromHex(bytes(stateStr, encoding='ascii'))
+            self.main_frame.restoreState(state)
+        else:
+            self.main_frame.setStretchFactor(0, 1)
+            self.main_frame.setStretchFactor(1, 3)
         
         status = self.statusBar()
         status.setSizeGripEnabled(True)
@@ -112,6 +118,7 @@ class EzPlot(QtWidgets.QMainWindow):
     
     def saveConfig(self, fn):
         self.config = {
+            'SplitterState' : str(self.main_frame.saveState().toHex(), encoding='ascii'),
             'WindowSize'    : (self.frameGeometry().width(), self.frameGeometry().height()),
             'DataFile'      : self.datafile.getValue(),
             'Style'         : self.combo_style.getValue(),
