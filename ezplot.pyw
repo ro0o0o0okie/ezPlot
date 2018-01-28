@@ -19,60 +19,19 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from matplotlib.figure import Figure
 from PyQt5 import QtCore, QtWidgets, QtGui
 
-import gui_base as bui
+import gui_base as gui
 
 
 __appname__ = 'EzPlot'
 __version__ = "2.0.0"
 __author__  = 'RayN'
-
-
 __config__ = os.path.join(os.path.dirname(__file__), 'config.json')
 
 
 def GetPlotSyles():
     return ['default', 'classic'] + sorted(
         style for style in plt.style.available if style != 'classic')
-
-
-# def SetPlotStyle():
-#     """ Set MPL plot paprameters """
-#     style.use('bmh')
-#     # style.use('seaborn-paper')
-#     # style.use('fivethirtyeight')
-#     # cn_font_prop = fontm.FontProperties(fname=settings.FILE_FIGURE_FONT, size=9) # fix legend CN issue
-#     # mpl.use('Qt5Agg')
-#     # mpl.rcParams['font.family'] = 'serif'
-#     # mpl.rcParams['font.sans-serif'] = ['SimHei'] # 指定默认字体
-#     # mpl.rcParams['font.serif'] = ['Times'] # 指定默认字体
-#     # mpl.rcParams['axes.unicode_minus'] = False # 解决保存图像是负号'-'显示为方块的问题
-# 
-#     # mpl.rcParams['figure.figsize'] = figsize # [8, 6] # inch
-#     # mpl.rcParams['figure.dpi'] = 100 # dots per inch
-# 
-#     # mpl.rcParams['savefig.dpi'] = 300
-#     # mpl.rcParams['savefig.bbox'] = 'tight'
-#     # mpl.rcParams['savefig.pad_inches'] = 0.0
-# 
-#     # mpl.rcParams['font.family'] = 'serif'
-#     # mpl.rcParams['font.size'] = 12
-# 
-#     # mpl.rcParams['legend.fontsize'] = 12
-#     # mpl.rcParams['legend.fancybox'] = True
-#     #
-#     # mpl.rcParams['lines.linewidth'] = 1.2
-#     # mpl.rcParams['lines.markersize'] = 5
-#     #
-#     # mpl.rcParams['axes.grid'] = False
-# 
-#     # mpl.rcParams['text.usetex'] = False
-#     # color cycle for plot lines
-#     # mpl.rcParams['axes.color_cycle'] = \
-#     # ['#348ABD', '#A60628', '#7A68A6', '#467821',
-#     #  '#D55E00', '#CC79A7', '#56B4E9', '#009E73', '#F0E442', '#0072B2']
-
         
-
 
 class EzPlot(QtWidgets.QMainWindow):
     def __init__(self, config:dict=None):
@@ -93,9 +52,11 @@ class EzPlot(QtWidgets.QMainWindow):
         self.setWindowTitle(__appname__ +'  v'+__version__ + '  by ' + __author__)
         self.resize(*self.config['WindowSize'])
         self.center()
-
+        
+        self.dataframe = None # init dataFrame
+        
         self.createMenu()
-        self.createLoader()
+        self.createLoaderPanel()
         self.createFigurePanel()
 
         self.main_frame = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
@@ -122,12 +83,12 @@ class EzPlot(QtWidgets.QMainWindow):
             'SplitterState' : str(self.main_frame.saveState().toHex(), encoding='ascii'),
             'DataFile'      : self.datafile.getValue(),
             'Style'         : self.combo_style.getValue(),
-            'FigWidth'      : self.edit_fig_width.getValue(), 
-            'FigHeight'     : self.edit_fig_height.getValue(), 
+            'FigWidth'      : self.editor_fig_width.getValue(), 
+            'FigHeight'     : self.editor_fig_height.getValue(), 
             'FlagClear'     : self.chkbox_clear.isChecked(), 
             'FlagGrid'      : self.chkbox_grid.isChecked(), 
             'FlagLegend'    : self.chkbox_legend.isChecked(),
-            'FontSize'      : self.edit_fontsz.getValue(),
+            'FontSize'      : self.editor_fontsz.getValue(),
         }
         json.dump(self.config, open(fn,'w'), indent=4)
         
@@ -148,13 +109,13 @@ class EzPlot(QtWidgets.QMainWindow):
     def showEvent(self, event):
         # update fig size text when show
         fsize = self.fig.get_size_inches()
-        self.setFigureSizeEditor(fsize[0], fsize[1])
+        self.setEditorFigureSize(fsize[0], fsize[1])
     
     
     def resizeEvent(self, event):
         # update fig size text when resized
         fsize = self.fig.get_size_inches()
-        self.setFigureSizeEditor(fsize[0], fsize[1])
+        self.setEditorFigureSize(fsize[0], fsize[1])
     
     
     def center(self):
@@ -164,16 +125,17 @@ class EzPlot(QtWidgets.QMainWindow):
         self.move(qr.topLeft())
 
 
-    def createLoader(self):
+    def createLoaderPanel(self):
         ''' create data file loader panel '''
         self.panel_loader = QtWidgets.QWidget()
-        # init dataFrame
-        self.dataframe = None
-        self.datafile = bui.File(label="Data", default=self.config['DataFile'], minWidth=120, callbackFunc=self.onLoadFile)
-        self.editor_x_axis = bui.ComboBox(textList=[], label='X Axis', connectFunc=self.updatePlotData)
-        self.editor_y_axis = bui.List(items=[], multiple=True, label="Y Axis", connectFunc=self.updatePlotData)
-        self.editor_legend = bui.Text(default=None, label='Legend',
-                 tooltip='multiple labels can be seperated by comma')
+        self.datafile = gui.File(label="Data", default=None, 
+                                 dlgDir=os.path.dirname(self.config['DataFile']), 
+                                 minWidth=120, callbackFunc=self.loadFile)
+        self.editor_x_axis = gui.ComboBox(textList=[], label='X Axis', connectFunc=self.updatePlot)
+        self.editor_y_axis = gui.List(items=[], multiple=True, label="Y Axis", editable=True, 
+                                      connectFunc=self.updatePlot, editCallbackFunc=self.onColumnLabelChanged)
+        self.editor_legend = gui.Text(default=None, label='Legend',
+                                      tooltip='multiple labels can be seperated by comma')
         self.editor_legend.editingFinished.connect(self.setCustomLegend)
 
         grid = QtWidgets.QGridLayout()
@@ -192,16 +154,26 @@ class EzPlot(QtWidgets.QMainWindow):
         grid.addWidget(self.editor_legend, 7, 1, 1, 2)
 
         self.panel_loader.setLayout(grid)
+    
+    
+    def onColumnLabelChanged(self, newItemText:str, oldItemText:str):
+        if self.dataframe is not None:
+            # rename df columns
+            self.dataframe.rename(columns={oldItemText: newItemText}, inplace=True)
+            # update x axis combo items
+            xidx = self.editor_x_axis.currentIndex()
+            colNames = self.dataframe.columns.tolist()
+            self.editor_x_axis.resetItems(textList=colNames, default=colNames[xidx])
+    
 
-
-    def onLoadFile(self):
-        # load data into dataFrame
-        datPath = self.datafile.getValue()
-        if os.path.isfile(datPath):
+    def loadFile(self):
+        """ load data into dataFrame """
+        fn = self.datafile.getValue()
+        if os.path.isfile(fn):
             df = None
             for readfunc in (pd.read_csv, pd.read_excel, pd.read_pickle, pd.read_table):
                 try:
-                    df = readfunc(datPath)
+                    df = readfunc(fn)
                     break 
                 except:
                     pass
@@ -226,6 +198,7 @@ class EzPlot(QtWidgets.QMainWindow):
         # Create the mpl Figure and FigCanvas objects.
         style.use(self.config['Style'])
         figsize = (self.config['FigWidth'], self.config['FigHeight'])
+        
         self.fig = Figure(figsize)
         self.canvas = FigureCanvas(figure=self.fig)
         self.canvas.setParent(self.panel_figure)
@@ -234,43 +207,35 @@ class EzPlot(QtWidgets.QMainWindow):
         toolbar = NavigationToolbar(self.canvas, self.panel_figure)
 
         # figure control widgets
-        self.botton_draw = QtWidgets.QPushButton("&Plot")
-        self.botton_draw.clicked.connect(self.updatePlotData)
-        
-        self.chkbox_clear = QtWidgets.QCheckBox("&Clear")
-        self.chkbox_clear.setChecked(self.config['FlagClear'])
-
-        self.chkbox_grid = QtWidgets.QCheckBox("&Grid")
-        self.chkbox_grid.setChecked(self.config['FlagGrid'])
-
-        self.chkbox_legend = QtWidgets.QCheckBox("&Legend")
-        self.chkbox_legend.setChecked(self.config['FlagLegend'])
-        
-        self.edit_fig_width = bui.Float(low=1, high=64, step=0.01, digits=2, default=figsize[0], label="FigWidth")
-        self.edit_fig_height = bui.Float(low=1, high=64, step=0.01, digits=2, default=figsize[1], label="FigHeight")
-        self.edit_fontsz = bui.Float(low=6, high=64, step=1.0, digits=1, default=self.config['FontSize'], label="FontSize")
-        self.edit_fontsz.valueChanged.connect(self.plot)
+        self.botton_draw = gui.MakePushButton('Plot', clickFunc=self.updatePlot)
+        self.chkbox_clear = gui.CheckBox(default=self.config['FlagClear'], label='Clear')
+        self.chkbox_grid = gui.CheckBox(default=self.config['FlagGrid'], label='Grid')
+        self.chkbox_legend = gui.CheckBox(default=self.config['FlagLegend'], label='Legend')
+        self.editor_fig_width = gui.Float(low=1, high=64, step=0.01, digits=2, default=figsize[0], label="FigWidth")
+        self.editor_fig_height = gui.Float(low=1, high=64, step=0.01, digits=2, default=figsize[1], label="FigHeight")
+        self.editor_fontsz = gui.Float(low=6, high=64, step=1.0, digits=1, default=self.config['FontSize'], label="FontSize")
+        self.editor_fontsz.valueChanged.connect(self.plot)
         
         styles = GetPlotSyles()
-        self.combo_style = bui.ComboBox(textList=styles, valueList=styles, label='Style', 
+        self.combo_style = gui.ComboBox(textList=styles, valueList=styles, label='Style',
                                         default=self.config['Style'],
                                         connectFunc=self.onStyleChanged)
         
-        hbox1 = bui.MakeHBoxLayout([
-            bui.MakeHBoxLayout([self.combo_style.labelText, self.combo_style]),
-            bui.MakeHBoxLayout([self.edit_fig_width.labelText, self.edit_fig_width]),
-            bui.MakeHBoxLayout([self.edit_fig_height.labelText, self.edit_fig_height])
+        hbox1 = gui.MakeHBoxLayout([
+            gui.MakeHBoxLayout([self.combo_style.labelText, self.combo_style]),
+            gui.MakeHBoxLayout([self.editor_fig_width.labelText, self.editor_fig_width]),
+            gui.MakeHBoxLayout([self.editor_fig_height.labelText, self.editor_fig_height])
         ])
-        hbox2 = bui.MakeHBoxLayout([
+        hbox2 = gui.MakeHBoxLayout([
             self.botton_draw, 
-            bui.MakeHBoxLayout([self.chkbox_clear, self.chkbox_grid, self.chkbox_legend]),
-            bui.MakeHBoxLayout([self.edit_fontsz.labelText, self.edit_fontsz])
+            gui.MakeHBoxLayout([self.chkbox_clear, self.chkbox_grid, self.chkbox_legend]),
+            gui.MakeHBoxLayout([self.editor_fontsz.labelText, self.editor_fontsz])
         ])
-        vbox = bui.MakeVBoxLayout([self.canvas, toolbar, hbox1, hbox2])
+        vbox = gui.MakeVBoxLayout([self.canvas, toolbar, hbox1, hbox2])
         self.panel_figure.setLayout(vbox)
     
 
-    def updatePlotData(self):
+    def updatePlot(self):
         self.selected_x_col = self.editor_x_axis.getValue()
         self.selected_y_cols = self.editor_y_axis.getValue() 
         try: # draw x v.s x is not allowed
@@ -280,9 +245,9 @@ class EzPlot(QtWidgets.QMainWindow):
         self.plot()
 
     
-    def setFigureSizeEditor(self, w, h):
-        self.edit_fig_width.setValue(w)
-        self.edit_fig_height.setValue(h)
+    def setEditorFigureSize(self, w, h):
+        self.editor_fig_width.setValue(w)
+        self.editor_fig_height.setValue(h)
         
     
     def onStyleChanged(self):
@@ -304,15 +269,15 @@ class EzPlot(QtWidgets.QMainWindow):
             if self.chkbox_clear.isChecked(): # clear the axes and redraw the plot anew
                 self.axes.clear()
             
-            customFigW = self.edit_fig_width.getValue()
-            customFigH = self.edit_fig_height.getValue()            
+            customFigW = self.editor_fig_width.getValue()
+            customFigH = self.editor_fig_height.getValue()            
             currentFigSize = self.fig.get_size_inches()
             if customFigW==0 or customFigH==0: # fig size not given, init to current fig size
-                self.setFigureSizeEditor(currentFigSize[0], currentFigSize[1])
+                self.setEditorFigureSize(currentFigSize[0], currentFigSize[1])
             elif currentFigSize[0]!=customFigW or currentFigSize[1]!=customFigH: # set to custom fig size
-                self.fig.set_size_inches(self.edit_fig_width.getValue(), self.edit_fig_height.getValue(), forward=True)
+                self.fig.set_size_inches(self.editor_fig_width.getValue(), self.editor_fig_height.getValue(), forward=True)
             
-            fontSz = self.edit_fontsz.value()
+            fontSz = self.editor_fontsz.value()
             legnON = self.chkbox_legend.isChecked()
             
             ax = self.dataframe.plot(x=self.selected_x_col, y=self.selected_y_cols,
@@ -356,7 +321,7 @@ class EzPlot(QtWidgets.QMainWindow):
             self.fig.savefig(path, dpi=300, bbox_inches='tight', transparent=True, pad_inches=0.2)
             self.statusBar().showMessage('Saved to %s' % path, 2000)
 
-    # =====================================================================
+    
     def createMenu(self):
         """"""
         def addActions(target, actions):

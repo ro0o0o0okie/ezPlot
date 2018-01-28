@@ -22,7 +22,7 @@ from PyQt5.QtGui import QPalette, QTextCursor
 from PyQt5.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, \
     QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLayout, QLineEdit, QMessageBox, \
     QPushButton, QSpinBox, QTabWidget, QTableWidget, QTableWidgetItem, \
-    QTextEdit, QVBoxLayout, QWidget, QListWidget, QAbstractItemView, QSizePolicy
+    QTextEdit, QVBoxLayout, QWidget, QListWidget, QAbstractItemView, QSizePolicy, QListWidgetItem
 
 
 ###############################################################################
@@ -624,8 +624,8 @@ class ComboBox(QComboBox):
 
 
 class List(QListWidget):
-    def __init__(self, items, default=None, multiple=True, readonly=False, minWidth=80,
-                 label="List", tooltip=None, connectFunc=None):
+    def __init__(self, items, default=None, multiple=True, readonly=False, editable=False, minWidth=80,
+                 label="List", tooltip=None, connectFunc=None, editCallbackFunc=None):
         """
         items: text items in list widget.
         multiple: allow multiple selection.
@@ -633,13 +633,11 @@ class List(QListWidget):
         """
         super(List, self).__init__()
         self._tooltip = tooltip
+        self._editable = editable
+        self._editCallback = editCallbackFunc # f(newItemText, oldItemText)
         self.labelText = QLabel(label+':')
         self.resetItems(items, default)
-        # self._items = items
-        # self.addItems(items)
-        # self._default = default
-        # self.setDefault()
-
+        
         if multiple:
             self.setSelectionMode(QAbstractItemView.ExtendedSelection) # multiple selection
         else:
@@ -662,6 +660,30 @@ class List(QListWidget):
         self.addItems(items)
         self._default = default
         self.setDefault()
+        if self._editable:
+            self.setItemsEditable()
+    
+    def setItemsEditable(self):
+        for i in range(self.count()):
+            flags = self.item(i).flags()
+            self.item(i).setFlags(flags | Qt.ItemIsEditable)
+        if self._editCallback:
+            self.itemChanged.connect(self.editCallback)
+    
+    def editCallback(self, item:QListWidgetItem):
+        midx = self.indexFromItem(item)
+        newItemText = self.itemFromIndex(midx).text()
+        oldItemText = self._items[midx.row()]
+        if newItemText:
+            if oldItemText!=newItemText:
+                if newItemText in self._items: # fix duplicate 
+                    newItemText += '*'
+                    self.itemFromIndex(midx).setText(newItemText)
+                    
+                self._editCallback(newItemText, oldItemText)
+                self._items[midx.row()] = newItemText
+        else: # if new text is empty, revert to previous
+            self.itemFromIndex(midx).setText(oldItemText)
     
     def setItemText(self, idx, text):
         self.item(idx).setText(text)
@@ -791,6 +813,7 @@ class File(QWidget):
         self.labelText = QLabel(label+':')
         self.text = QLineEdit()
         self.text.setMinimumWidth(minWidth)
+        self.setFocusPolicy(Qt.StrongFocus) # diable wheel focus
         
         if default and os.path.isfile(default):
             self.default = abspath(default)
@@ -806,8 +829,7 @@ class File(QWidget):
         if tooltip  : self.text.setToolTip(tooltip)
         if readonly : self.enable(False)
 
-        self.button = MakePushButton('select', clickFunc=self.selectFile, tooltip='select a file',
-                                     maxWidth=100)
+        self.button = MakePushButton('...', clickFunc=self.selectFile, tooltip='select a file', maxWidth=60)
         layout = QHBoxLayout()
         layout.addWidget(self.text)
         layout.addWidget(self.button)
@@ -832,11 +854,10 @@ class File(QWidget):
     #         QMessageBox.warning(self, "注意", "找不到文件<%s>，请检查输入路径是否正确！"%filePath)
 
     def selectFile(self):
-        if self._dlg_dir is None:
-            # use current date path as default open dir
-            curDir = os.path.dirname(self.getValue()) # split(unicode(self.text.text()))[0]
-        else:
+        if self._dlg_dir and os.path.isdir(self._dlg_dir):
             curDir = self._dlg_dir
+        else: # use current date path as default open dir
+            curDir = os.path.dirname(self.getValue()) # split(unicode(self.text.text()))[0]
         fileName, _ = QFileDialog.getOpenFileName(self, self._dlg_title, curDir, self._dlg_filter)
         if fileName: # selected
             self.setValue(abspath(fileName))
@@ -873,7 +894,8 @@ class Path(QWidget):
         self.text = QLineEdit()
         self.text.setMinimumWidth(minWidth)
         self.labelText.setBuddy(self.text)
-
+        self.setFocusPolicy(Qt.StrongFocus) # diable wheel focus
+        
         if chkDir: # check give path existence
             self.text.editingFinished.connect(self.checkPath)
 
