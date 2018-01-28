@@ -12,6 +12,7 @@ import json
 import warnings
 import pandas as pd
 import matplotlib as plt
+import qdarkstyle
 
 from matplotlib import style
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -367,6 +368,28 @@ class EzPlot(QtWidgets.QMainWindow):
 
 
 
+def SetDarkUI(app):
+    """ ref: https://gist.github.com/lschmierer/443b8e21ad93e2a2d7eb """
+    app.setStyle("Fusion")
+    dark_palette = QtGui.QPalette()
+    dark_palette.setColor(QtGui.QPalette.Window, QtGui.QColor(53, 53, 53))
+    dark_palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
+    dark_palette.setColor(QtGui.QPalette.Base, QtGui.QColor(25, 25, 25))
+    dark_palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(53, 53, 53))
+    dark_palette.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.white)
+    dark_palette.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.white)
+    dark_palette.setColor(QtGui.QPalette.Text, QtCore.Qt.white)
+    dark_palette.setColor(QtGui.QPalette.Button, QtGui.QColor(53, 53, 53))
+    dark_palette.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.white)
+    dark_palette.setColor(QtGui.QPalette.BrightText, QtCore.Qt.red)
+    dark_palette.setColor(QtGui.QPalette.Link, QtGui.QColor(42, 130, 218))
+    dark_palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor(42, 130, 218))
+    dark_palette.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.black)
+    
+    app.setPalette(dark_palette)
+    app.setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }")
+
+
 def main():
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName(__appname__)
@@ -374,19 +397,22 @@ def main():
     curFd = os.path.dirname(os.path.realpath(__file__))
     app.setWindowIcon(QtGui.QIcon(os.path.join(curFd, 'icons', 'logo.png')))
     
-    resolution = app.desktop().screenGeometry()
-    w, h = resolution.width(), resolution.height()
-    
     try:
         config = json.load(open(__config__))
+        if 'Style' in config and config['Style']=='dark_background':
+            # SetDarkUI(app) # if figure use dark theme, we make gui dark too ;)
+            app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
     except Exception as e:
         warnings.warn('load config file failed, use default config. \n%r'%e)
-        config = {
-            'WindowSize' : (int(0.382*w), int(0.5*h))
-        }
+        resolution = app.desktop().screenGeometry()
+        w, h = resolution.width(), resolution.height()
+        config = { 'WindowSize' : (int(0.382*w), int(0.5*h)) }
+        
     window = EzPlot(config)
     window.show()
     app.exec_()
+
+
 
 if __name__ == "__main__":
     main()
