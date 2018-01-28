@@ -27,7 +27,7 @@ __version__ = "2.0.0"
 __author__  = 'RayN'
 
 
-__config__ = 'config.json'
+__config__ = os.path.join(os.path.dirname(__file__), 'config.json')
 
 
 def GetPlotSyles():
