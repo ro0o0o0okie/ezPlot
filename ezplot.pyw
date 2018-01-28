@@ -209,7 +209,7 @@ class EzPlot(QtWidgets.QMainWindow):
             if df is None or df.empty:
                 self.statusBar().showMessage('Read data file failed! (supported formats: CSV, Pickle, Excel)', 8000)
             else:
-                # df.reset_index(level=None, inplace=True)
+                df.reset_index(level=None, inplace=True)
                 self.dataframe = df
                 colNames = df.columns.tolist()
                 self.editor_y_axis.resetItems(colNames)

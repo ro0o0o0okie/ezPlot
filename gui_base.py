@@ -600,8 +600,11 @@ class ComboBox(QComboBox):
 
     def setDefault(self):
         """ reset to default value. """
-        if self._default is not None:
-            self.setValue(self._default)
+        if self.valueList:
+            if self._default is not None:
+                self.setValue(self._default)
+            else:
+                self.setValue(self.valueList[0])
 
     def getValue(self):
         """ return current selected value.  """
@@ -683,6 +686,8 @@ class List(QListWidget):
         """ reset to default value. """
         if self._default is not None:
             self.setValue(self._default)
+        else:
+            self.clearSelection()
 
     def getValue(self):
         """ return current selected value.  """
@@ -772,27 +777,37 @@ class Array(QTableWidget):
 
 class File(QWidget):
     """ A LineEdit with file path and a botton for file selection. """
-    def __init__(self, default=None, minWidth=80, label="FilePath", chkFile=True, readonly=False,
-                 dlgTitle='选择指定文件', dlgDir=None, dlgFilter='(*.*)',  tooltip=None, 
-                 selectedPostFunc=None):
+    def __init__(self, default=None, minWidth=80, label="FilePath", readonly=False,
+                 dlgTitle='Select a file', dlgDir=None, dlgFilter='(*.*)', tooltip=None,
+                 callbackFunc=None):
         super(File, self).__init__()
+        # self._chkfile = chkFile
         self._dlg_title = dlgTitle
         self._dlg_dir = dlgDir
         self._dlg_filter = dlgFilter
         self._tooltip = tooltip
-        self._selectedPostFunc = selectedPostFunc
+        self._callback = callbackFunc
 
         self.labelText = QLabel(label+':')
         self.text = QLineEdit()
         self.text.setMinimumWidth(minWidth)
-        self.default = abspath(default) if default and exists(abspath(default)) else ""
-        self.setDefault()
+        
+        if default and os.path.isfile(default):
+            self.default = abspath(default)
+            self.setValue(default)
+            # if callbackFunc: 
+            #     callbackFunc()
+        else:
+            self.default = ''
+            self.setDefault()
+        
+        self.text.editingFinished.connect(self.onEditFinished)
+        
         if tooltip  : self.text.setToolTip(tooltip)
-        if chkFile  : self.text.editingFinished.connect(self.checkFile)
         if readonly : self.enable(False)
 
-        self.button = MakePushButton("选择", clickFunc=self.selectFile, tooltip='选择指定文件',
-                                     maxWidth=80)
+        self.button = MakePushButton('select', clickFunc=self.selectFile, tooltip='select a file',
+                                     maxWidth=100)
         layout = QHBoxLayout()
         layout.addWidget(self.text)
         layout.addWidget(self.button)
@@ -800,24 +815,33 @@ class File(QWidget):
         layout.setSpacing(5)
 
         self.setLayout(layout)
-
-    def checkFile(self):
-        """ init user-defined working dir. """
-        filePath = str(self.text.text())
-        if len(filePath) and not exists(filePath):
-            QMessageBox.warning(self, "注意", "找不到文件<%s>，请检查输入路径是否正确！"%filePath)
+    
+    def onEditFinished(self):
+        fn = self.getValue()
+        if fn:
+            if not os.path.isfile(fn):
+                QMessageBox.warning(self, "Error", "Can not find file <%s>！"%fn)
+            else:
+                if self._callback:
+                    self._callback()
+        
+    # def checkFile(self):
+    #     """ init user-defined working dir. """
+    #     filePath = str(self.text.text())
+    #     if len(filePath) and not exists(filePath):
+    #         QMessageBox.warning(self, "注意", "找不到文件<%s>，请检查输入路径是否正确！"%filePath)
 
     def selectFile(self):
         if self._dlg_dir is None:
-        # use current date path as default open dir
+            # use current date path as default open dir
             curDir = os.path.dirname(self.getValue()) # split(unicode(self.text.text()))[0]
         else:
             curDir = self._dlg_dir
         fileName, _ = QFileDialog.getOpenFileName(self, self._dlg_title, curDir, self._dlg_filter)
         if fileName: # selected
-            self.text.setText(abspath(fileName))
-            if self._selectedPostFunc:
-                self._selectedPostFunc()
+            self.setValue(abspath(fileName))
+            if self._callback:
+                self._callback()
 
     def setValue(self, fileName):
         self.text.setText(fileName)
