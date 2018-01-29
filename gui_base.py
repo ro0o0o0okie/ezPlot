@@ -435,7 +435,7 @@ class Text(QLineEdit):
 
 class Int(QSpinBox):
     def __init__(self, low, high, step, default=None,
-                 prefix=None, suffix=None, readonly=False, minWidth=50, label="Integer", tooltip=None):
+                 prefix=None, suffix=None, readonly=False, minWidth=50, maxWidth=None, label="Integer", tooltip=None):
         super(Int, self).__init__()
         self.labelText = QLabel(label+':')
         self.default = default if default is not None else low # use 'low' as default if not given
@@ -446,7 +446,8 @@ class Int(QSpinBox):
         if suffix is not None : self.setSuffix(suffix)
         if readonly : self.enable(False) # self.setReadOnly(True)
         if tooltip  : self.setToolTip(tooltip)
-        self.setMinimumWidth(minWidth)
+        if minWidth: self.setMinimumWidth(minWidth)
+        if maxWidth: self.setMaximumWidth(maxWidth)
         self.setFocusPolicy(Qt.StrongFocus) # diable wheel focus
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed) # horizon fill
     # def setValue(self, val):

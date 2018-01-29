@@ -208,7 +208,7 @@ class EzPlot(QtWidgets.QMainWindow):
         toolbar = NavigationToolbar(self.canvas, self.panel_figure)
 
         # figure control widgets
-        self.botton_draw = gui.MakePushButton('Plot', clickFunc=self.updatePlot)
+        self.botton_draw = gui.MakePushButton('Plot', minWidth=120, clickFunc=self.updatePlot)
         self.chkbox_clear = gui.CheckBox(default=self.config['FlagClear'], label='Clear')
         self.chkbox_grid = gui.CheckBox(default=self.config['FlagGrid'], label='Grid')
         self.chkbox_legend = gui.CheckBox(default=self.config['FlagLegend'], label='Legend')
@@ -216,6 +216,8 @@ class EzPlot(QtWidgets.QMainWindow):
         self.editor_fig_height = gui.Float(low=1, high=64, step=0.01, digits=2, default=figsize[1], label="FigHeight")
         self.editor_fontsz = gui.Float(low=6, high=64, step=1.0, digits=1, default=self.config['FontSize'], label="FontSize")
         self.editor_fontsz.valueChanged.connect(self.plot)
+        self.editor_skip = gui.Int(low=0, high=100, step=1, default=0, label='DataSkip', 
+                                   tooltip='plot every nth data row')
         
         styles = GetPlotSyles()
         self.combo_style = gui.ComboBox(textList=styles, valueList=styles, label='Style',
@@ -230,7 +232,8 @@ class EzPlot(QtWidgets.QMainWindow):
         hbox2 = gui.MakeHBoxLayout([
             self.botton_draw, 
             gui.MakeHBoxLayout([self.chkbox_clear, self.chkbox_grid, self.chkbox_legend]),
-            gui.MakeHBoxLayout([self.editor_fontsz.labelText, self.editor_fontsz])
+            gui.MakeHBoxLayout([self.editor_fontsz.labelText, self.editor_fontsz]),
+            gui.MakeHBoxLayout([self.editor_skip.labelText, self.editor_skip])
         ])
         vbox = gui.MakeVBoxLayout([self.canvas, toolbar, hbox1, hbox2])
         self.panel_figure.setLayout(vbox)
@@ -278,14 +281,17 @@ class EzPlot(QtWidgets.QMainWindow):
             elif currentFigSize[0]!=customFigW or currentFigSize[1]!=customFigH: # set to custom fig size
                 self.fig.set_size_inches(self.editor_fig_width.getValue(), self.editor_fig_height.getValue(), forward=True)
             
-            fontSz = self.editor_fontsz.value()
-            legnON = self.chkbox_legend.isChecked()
+            fontSz = self.editor_fontsz.getValue()
+            legnON = self.chkbox_legend.getValue()
+            skip = self.editor_skip.getValue()
             
-            ax = self.dataframe.plot(x=self.selected_x_col, y=self.selected_y_cols,
-                                     ax=self.axes,
-                                     fontsize=fontSz,
-                                     grid=self.chkbox_grid.isChecked(),
-                                     legend=legnON)
+            df = self.dataframe if skip==0 else self.dataframe.iloc[::skip, :]
+            ax = df.plot(x=self.selected_x_col, 
+                         y=self.selected_y_cols,
+                         ax=self.axes,
+                         fontsize=fontSz,
+                         grid=self.chkbox_grid.isChecked(),
+                         legend=legnON)
     
             # ax.patch.set_alpha(0)
     
@@ -406,7 +412,7 @@ def main():
         warnings.warn('load config file failed, use default config. \n%r'%e)
         resolution = app.desktop().screenGeometry()
         w, h = resolution.width(), resolution.height()
-        config = { 'WindowSize' : (int(0.382*w), int(0.5*h)) }
+        config = { 'WindowSize' : (int(0.382*w), int(0.45*h)) }
         
     window = EzPlot(config)
     window.show()
