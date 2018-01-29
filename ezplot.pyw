@@ -216,8 +216,8 @@ class EzPlot(QtWidgets.QMainWindow):
         self.editor_fig_height = gui.Float(low=1, high=64, step=0.01, digits=2, default=figsize[1], label="FigHeight")
         self.editor_fontsz = gui.Float(low=6, high=64, step=1.0, digits=1, default=self.config['FontSize'], label="FontSize")
         self.editor_fontsz.valueChanged.connect(self.plot)
-        self.editor_skip = gui.Int(low=0, high=100, step=1, default=0, label='DataSkip', 
-                                   tooltip='plot every nth data row')
+        self.editor_skip = gui.Int(low=0, high=100, step=1, default=0, label='DataSkip', tooltip='plot every nth data row')
+        self.editor_skip.valueChanged.connect(self.plot)
         
         styles = GetPlotSyles()
         self.combo_style = gui.ComboBox(textList=styles, valueList=styles, label='Style',
