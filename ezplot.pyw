@@ -14,7 +14,7 @@ import pandas as pd
 import matplotlib as plt
 import qdarkstyle
 
-from matplotlib import style
+from matplotlib import style, colors
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
@@ -40,7 +40,7 @@ class EzPlot(QtWidgets.QMainWindow):
         self.config = {
             'WindowSize' : (1200, 800),
             'SplitterState' : None,
-            'DataFile' : None,
+            'DataFile' : os.path.dirname(__file__),
             'Style' : 'default',
             'FigWidth' : 5, 'FigHeight' : 4, 
             'FlagClear' : True, 'FlagGrid' : True, 'FlagLegend' : True,
@@ -292,13 +292,21 @@ class EzPlot(QtWidgets.QMainWindow):
                          fontsize=fontSz,
                          grid=self.chkbox_grid.isChecked(),
                          legend=legnON)
-    
             # ax.patch.set_alpha(0)
-    
+            
+            # # apply individual user-custom styles
+            # for col in self.selected_y_cols:
+            #     usersty = self.editor_y_axis.getUserStyle(col) # return None if use default
+            #     if bool(usersty):
+            #         for line in ax.get_lines():
+            #             if line.get_label() == col:
+            #                 usersty.apply(line)
+                        
+                    
             # axis label font size
             for item in [ax.title, ax.xaxis.label, ax.yaxis.label]:
                 item.set_fontsize(fontSz)
-    
+            
             if legnON: # legend font & transparency
                 ax.legend(borderpad=0.2, labelspacing=0.2, framealpha=0.8, fontsize=fontSz)
                 legn = ax.get_legend()
@@ -412,7 +420,7 @@ def main():
         warnings.warn('load config file failed, use default config. \n%r'%e)
         resolution = app.desktop().screenGeometry()
         w, h = resolution.width(), resolution.height()
-        config = { 'WindowSize' : (int(0.382*w), int(0.45*h)) }
+        config = { 'WindowSize' : (int(0.382*w), int(0.5*h)) }
         
     window = EzPlot(config)
     window.show()
