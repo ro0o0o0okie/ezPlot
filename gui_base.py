@@ -163,6 +163,18 @@ def MakeTabWidget(wgts):
     return tabs
 
 
+
+class WidgetWithLabel(QWidget):
+    def __init__(self, wgt, parent=None):
+        super().__init__(parent)
+        self.widget = wgt
+        layout = MakeHBoxLayout([wgt.labelText, wgt])
+        layout.setContentsMargins(0,0,0,0)
+        layout.setSpacing(5)
+        self.setLayout(layout)
+
+
+
 class WidgetsPage(QWidget, object):
     """A basic page widget with some config wgts"""
     def __init__(self, parent=None, hierarchyKey=None):
@@ -572,6 +584,8 @@ class ComboBox(QComboBox):
         self.setMinimumWidth(minWidth)
         if connectFunc is not None: # when idx changed call connectFunc(idx)
             self.currentIndexChanged.connect(connectFunc)
+        
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed) # horizon fill
     
     def resetItems(self, textList, valueList=None, default=None):
         """"""
