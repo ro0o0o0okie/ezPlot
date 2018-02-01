@@ -9,7 +9,7 @@
 import os
 from collections import OrderedDict
 
-from PyQt5 import QtWidgets, QtCore
+from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtCore import Qt, pyqtSlot
 
 import gui_base as gui
@@ -110,17 +110,56 @@ class DataFrameTree(QtWidgets.QTreeWidget):
     
     signal_column_renamed = QtCore.pyqtSignal(tuple) # (fn, oldName, newName) 
     signal_active_style_changed = QtCore.pyqtSignal() 
+    signal_dataframe_deleted = QtCore.pyqtSignal(str) # fn
+    signal_dataframe_reload = QtCore.pyqtSignal(str) # fn
     
     def __init__(self, label='DataFrameTree', parent=None):
         super().__init__(parent)
         # self.setHeaderLabel('DataFrameTree')
+        self.labelText = QtWidgets.QLabel(label+':')
         self.setHeaderHidden(True)
         self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection) # allow multiple selection
         self.setRootIsDecorated(True)
         self.setIndentation(20)
-        self.labelText = QtWidgets.QLabel(label+':')
+        self.makeContextMenu()
         
         self.df_nodes = OrderedDict() # fn => DataFrameNode
+    
+    
+    def makeContextMenu(self):
+        self.ctxMenuOnDf = QtWidgets.QMenu(self)
+        # reload dataframe
+        actReload = QtWidgets.QAction('Reload', self)
+        actReload.triggered.connect(self.reloadDf)
+        self.ctxMenuOnDf.addAction(actReload)
+        # delete dataframe
+        actDelete = QtWidgets.QAction('Delete', self)
+        actDelete.triggered.connect(self.removeDf)
+        self.ctxMenuOnDf.addAction(actDelete)
+        
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.showContextMenu)
+    
+    
+    def removeDf(self):
+        dfnode = self.currentItem()
+        if isinstance(dfnode, DataFrameNode):
+            dfnode.deleteColumns()
+            fn = dfnode.datafile
+            del self.df_nodes[fn]
+            self.takeTopLevelItem(self.indexOfTopLevelItem(dfnode))
+            self.signal_dataframe_deleted.emit(fn)
+        
+    def reloadDf(self):
+        dfnode = self.currentItem()
+        if isinstance(dfnode, DataFrameNode):
+            self.signal_dataframe_reload.emit(dfnode.datafile)
+    
+    def showContextMenu(self, event):
+        # print(self.currentItem(), type(self.currentItem()))
+        if isinstance(self.currentItem(), DataFrameNode):
+            self.ctxMenuOnDf.exec_(QtGui.QCursor.pos())
+            
     
     def addDataFrame(self, datafn, columns):
         if datafn in self.df_nodes:
@@ -161,10 +200,13 @@ class DataFrameNode(QtWidgets.QTreeWidgetItem):
     def __hash__(self):
         return self._hash
     
-    def updateColumns(self, columnNames):
+    def deleteColumns(self):
         for c in self.column_nodes:
             self.removeChild(c)
         self.column_nodes.clear()
+    
+    def updateColumns(self, columnNames):
+        self.deleteColumns()
         self.column_nodes = [ DataColumnNode(colname=cn, parent=self) for cn in columnNames ]
         
     

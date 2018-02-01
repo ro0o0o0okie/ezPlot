@@ -84,8 +84,8 @@ class EzPlot(QtWidgets.QMainWindow):
     
     
     def saveConfig(self, fn):
-        self.config = {
-            'WindowSize'    : (self.frameGeometry().width(), self.frameGeometry().height()),
+        self.config.update({
+            # 'WindowSize'    : (self.frameGeometry().width(), self.frameGeometry().height()),
             'SplitterState' : str(self.main_frame.saveState().toHex(), encoding='ascii'),
             'DataFile'      : self.editor_datafile.getValue(),
             'Style'         : self.combo_style.getValue(),
@@ -95,7 +95,7 @@ class EzPlot(QtWidgets.QMainWindow):
             'FlagGrid'      : self.chkbox_grid.isChecked(), 
             'FlagLegend'    : self.chkbox_legend.isChecked(),
             'FontSize'      : self.editor_fontsz.getValue(),
-        }
+        })
         json.dump(self.config, open(fn,'w'), indent=4)
         
     
@@ -122,6 +122,8 @@ class EzPlot(QtWidgets.QMainWindow):
         # update fig size text when resized
         fsize = self.fig.get_size_inches()
         self.setEditorFigureSize(fsize[0], fsize[1])
+        wsize = self.frameSize()
+        self.config['WindowSize'] = (wsize.width(), wsize.height())
     
     
     def center(self):
@@ -138,12 +140,14 @@ class EzPlot(QtWidgets.QMainWindow):
                                         dlgDir=os.path.dirname(self.config['DataFile']),
                                         minWidth=120, callbackFunc=self.loadFile)
         self.editor_x_axis = gui.ComboBox(textList=[], label='X Axis', connectFunc=self.plot)
-        # self.editor_y_axis_ = gui.List(items=[], multiple=True, label="Y Axis", editable=True,
-        #                                connectFunc=self.updatePlot, editCallbackFunc=self.onColumnRenamed)
+
+
         self.editor_y_axis = DataFrameTree(parent=self,label='Y Axis')
         self.editor_y_axis.itemSelectionChanged.connect(self.plot)
         self.editor_y_axis.signal_column_renamed.connect(self.onColumnRenamed)
         self.editor_y_axis.signal_active_style_changed.connect(self.plot)
+        self.editor_y_axis.signal_dataframe_deleted.connect(self.onDataFrameDeleted)
+        self.editor_y_axis.signal_dataframe_reload.connect(self.onDataFrameReload)
         
         self.editor_legend = gui.Text(default=None, label='Legend',
                                       tooltip='multiple labels can be seperated by comma')
@@ -167,12 +171,22 @@ class EzPlot(QtWidgets.QMainWindow):
         self.panel_loader.setLayout(grid)
     
     
-    def updateXAxisNames(self, colNames):
+    def updateXAxisNames(self, colNames=None):
         """update the common x-axis names for editor_x_axis, keep currently selected if possible"""
-        xSelected = self.editor_x_axis.getValue()
-        if xSelected not in colNames:
-            xSelected = None
-        self.editor_x_axis.resetItems(sorted(colNames), default=xSelected)
+        if colNames is None: # update to current df if given None
+            if self.dataframes:
+                commonNames = set.intersection(*[set(df.columns) for df in self.dataframes.values()])
+            else:
+                commonNames = []
+            self.updateXAxisNames(commonNames)
+        else:  
+            if colNames: # non-empty
+                xSelected = self.editor_x_axis.getValue()
+                if xSelected not in colNames:
+                    xSelected = None
+                self.editor_x_axis.resetItems(sorted(colNames), default=xSelected)
+            else:
+                self.editor_x_axis.resetItems([])
     
     
     @pyqtSlot(tuple) #  (fn, oldName, newName) 
@@ -182,13 +196,25 @@ class EzPlot(QtWidgets.QMainWindow):
         # rename df columns
         df.rename(columns={oldName:newName}, inplace=True)
         # update x-axis to current common names
-        commonNames = set.intersection(*[set(df.columns) for df in self.dataframes.values()])
-        self.updateXAxisNames(commonNames)
+        # commonNames = set.intersection(*[set(df.columns) for df in self.dataframes.values()])
+        self.updateXAxisNames()
     
-
-    def loadFile(self):
+    @pyqtSlot(str) # fn
+    def onDataFrameDeleted(self, fn:str):
+        if fn in self.dataframes:
+            del self.dataframes[fn]
+            # update x-axis to current common names
+            self.updateXAxisNames()
+    
+    @pyqtSlot(str) # fn
+    def onDataFrameReload(self, fn:str):
+        self.loadFile(fn)
+    
+    
+    def loadFile(self, fn:str=None):
         """ load data into dataFrame """
-        fn = os.path.abspath(self.editor_datafile.getValue())
+        if fn is None:
+            fn = os.path.abspath(self.editor_datafile.getValue())
         if os.path.isfile(fn):
             df = None
             for readfunc in (pd.read_csv, pd.read_excel, pd.read_pickle, pd.read_table):
@@ -209,16 +235,20 @@ class EzPlot(QtWidgets.QMainWindow):
                 # update y-axis dfTree
                 self.editor_y_axis.addDataFrame(datafn=fn, columns=colNames)
                 # update x-axis common columns
-                if self.editor_x_axis.count()>0 and not reload:
-                    commonNames =  set(colNames).intersection(self.editor_x_axis.textList)   #{*colNames, *self.editor_x_axis.textList}
-                    self.updateXAxisNames(commonNames)
-                else: # x-axis empty 
-                    if len(self.dataframes)==1: # first load or reload
-                        # keep the selected x if reload
-                        xSelected = self.editor_x_axis.getValue() if reload else colNames[0]
-                        self.editor_x_axis.resetItems(colNames, default=xSelected)
-                    else: # >1, empty due to no common
-                        pass # keep empty
+                # commonNames = set.intersection(*[set(df.columns) for df in self.dataframes.values()])
+                self.updateXAxisNames()
+                
+                # if self.editor_x_axis.count()>0 and not reload:
+                #     commonNames = set(colNames).intersection(self.editor_x_axis.textList)   #{*colNames, *self.editor_x_axis.textList}
+                #     self.updateXAxisNames(commonNames)
+                # else: # x-axis empty 
+                #     if len(self.dataframes)==1: # first load or reload
+                #         # keep the selected x if reload
+                #         self.updateXAxisNames(colNames)
+                #         # xSelected = self.editor_x_axis.getValue() if reload else colNames[0]
+                #         # self.editor_x_axis.resetItems(colNames, default=xSelected)
+                #     else: # >1, empty due to no common
+                #         pass # keep empty
         
                 self.statusBar().showMessage('Data loaded successfully.', 5000)
         else:

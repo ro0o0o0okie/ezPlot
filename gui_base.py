@@ -599,9 +599,10 @@ class ComboBox(QComboBox):
         self.clear()
         for text in textList:
             self.addItem(text)
-            
-        self._default = default
-        self.setDefault()
+        
+        if default in self.valueList:
+            self._default = default
+            self.setDefault()
         
     
     def setConnectFunc(self, func):
