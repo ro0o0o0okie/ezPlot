@@ -174,9 +174,12 @@ class EzPlot(QtWidgets.QMainWindow):
     def updateXAxisNames(self, colNames=None):
         """update the common x-axis names for editor_x_axis, keep currently selected if possible"""
         if colNames is None: # update to current df if given None
-            if self.dataframes:
+            ndf = len(self.dataframes)
+            if ndf>1:
                 commonNames = set.intersection(*[set(df.columns) for df in self.dataframes.values()])
-            else:
+            elif ndf==1:
+                commonNames = [df.columns.tolist() for df in self.dataframes.values()][0]
+            else: # <1
                 commonNames = []
             self.updateXAxisNames(commonNames)
         else:  
@@ -184,7 +187,7 @@ class EzPlot(QtWidgets.QMainWindow):
                 xSelected = self.editor_x_axis.getValue()
                 if xSelected not in colNames:
                     xSelected = None
-                self.editor_x_axis.resetItems(sorted(colNames), default=xSelected)
+                self.editor_x_axis.resetItems(list(colNames), default=xSelected)
             else:
                 self.editor_x_axis.resetItems([])
     
@@ -235,21 +238,7 @@ class EzPlot(QtWidgets.QMainWindow):
                 # update y-axis dfTree
                 self.editor_y_axis.addDataFrame(datafn=fn, columns=colNames)
                 # update x-axis common columns
-                # commonNames = set.intersection(*[set(df.columns) for df in self.dataframes.values()])
-                self.updateXAxisNames()
-                
-                # if self.editor_x_axis.count()>0 and not reload:
-                #     commonNames = set(colNames).intersection(self.editor_x_axis.textList)   #{*colNames, *self.editor_x_axis.textList}
-                #     self.updateXAxisNames(commonNames)
-                # else: # x-axis empty 
-                #     if len(self.dataframes)==1: # first load or reload
-                #         # keep the selected x if reload
-                #         self.updateXAxisNames(colNames)
-                #         # xSelected = self.editor_x_axis.getValue() if reload else colNames[0]
-                #         # self.editor_x_axis.resetItems(colNames, default=xSelected)
-                #     else: # >1, empty due to no common
-                #         pass # keep empty
-        
+                self.updateXAxisNames()        
                 self.statusBar().showMessage('Data loaded successfully.', 5000)
         else:
             self.statusBar().showMessage('File does not exist', 5000)
