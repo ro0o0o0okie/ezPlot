@@ -14,13 +14,12 @@ import pandas as pd
 import matplotlib as plt
 import qdarkstyle
 from collections import OrderedDict, defaultdict
-
-from PyQt5.QtCore import pyqtSlot
 from matplotlib import style, colors
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from PyQt5 import QtCore, QtWidgets, QtGui
+from PyQt5.QtCore import pyqtSlot
 
 import gui_base as gui
 from yaxis_selector import DataFrameTree
