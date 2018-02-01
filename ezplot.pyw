@@ -59,11 +59,7 @@ class EzPlot(QtWidgets.QMainWindow):
         self.resize(*self.config['WindowSize'])
         self.center()
         
-        # self.dataframe = None # init dataFrame
         self.dataframes = OrderedDict() # fn => df
-        # self.selected_x_col = None      # selected x-axis column name
-        # self.selected_y_col_names = {}  # fn => [selected y-axis column nodes]
-        # self.selected_y_col_nodes = {}  # fn => [selected y-axis column names]
         
         self.createMenu()
         self.createLoaderPanel()
@@ -186,9 +182,6 @@ class EzPlot(QtWidgets.QMainWindow):
         # rename df columns
         df.rename(columns={oldName:newName}, inplace=True)
         # update x-axis to current common names
-        # commonNames = [*self.editor_x_axis.textList]
-        # if oldName in commonNames:
-        #     commonNames.remove(oldName)
         commonNames = set.intersection(*[set(df.columns) for df in self.dataframes.values()])
         self.updateXAxisNames(commonNames)
     
@@ -277,13 +270,6 @@ class EzPlot(QtWidgets.QMainWindow):
         ])
         vbox = gui.MakeVBoxLayout([self.canvas, toolbar, hbox1, hbox2])
         self.panel_figure.setLayout(vbox)
-    
-
-    # def updatePlot(self):
-    #     self.selected_x_col = self.editor_x_axis.getValue()
-    #     # self.selected_y_cols = self.editor_y_axis.getValue() 
-    #     self.selected_y_cols = self.editor_y_axis.getSelectedColumnNames(excludeName=self.selected_x_col)
-    #     self.plot()
 
     
     def setEditorFigureSize(self, w, h):
@@ -299,16 +285,6 @@ class EzPlot(QtWidgets.QMainWindow):
         self.fig.set_edgecolor(plt.rcParams['figure.edgecolor'])
         self.axes.set_facecolor(plt.rcParams['axes.facecolor'])
         self.plot()
-    
-    
-    # def getColumnNamesFromNodes(self, columnNodes:dict, excludeName=None):
-    #     names = {} # fn => [selected column names]
-    #     for fn, cols in columnNodes.items():
-    #         if excludeName:
-    #             names[fn] = [col.column_name for col in cols if cols.column_name!=excludeName]
-    #         else:
-    #             names[fn] = [col.column_name for col in cols]
-    #     return names
     
     
     def plot(self):

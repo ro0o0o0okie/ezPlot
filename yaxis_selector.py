@@ -15,17 +15,6 @@ from PyQt5.QtCore import Qt, pyqtSlot
 import gui_base as gui
 
 
-
-
-# def AsNamedWidget(wgt):
-#     layout = QtWidgets.QHBoxLayout()
-#     layout.addWidget(wgt.labelText)
-#     layout.addWidget(wgt)
-#     # layout.setContentsMargins(0,0,0,0)
-#     # layout.setSpacing(5)
-#     wgt.setLayout(layout)
-#     # return wgt
-
 class UserDefinedStyle(object):
     
     def __init__(self):
@@ -119,13 +108,8 @@ class StyleModifier(QtWidgets.QWidget):
 
 class DataFrameTree(QtWidgets.QTreeWidget):
     
-    
     signal_column_renamed = QtCore.pyqtSignal(tuple) # (fn, oldName, newName) 
     signal_active_style_changed = QtCore.pyqtSignal() 
-    
-    # signal_colnode_renamed = QtCore.pyqtSignal(tuple) # (oldName, newName)
-    # signal_colnode_selected_and_style_changed = QtCore.pyqtSignal()
-    
     
     def __init__(self, label='DataFrameTree', parent=None):
         super().__init__(parent)
@@ -155,32 +139,15 @@ class DataFrameTree(QtWidgets.QTreeWidget):
                 nodes[fn] = cols
         return nodes
     
-    # def getSelectedColumnNames(self, excludeName=None):
-    #     names = {} # fn => [selected column names]
-    #     for fn, cols in self.getSelectedColumns().items():
-    #         if excludeName:
-    #             names[fn] = [col.column_name for col in cols if cols.column_name!=excludeName]
-    #         else:
-    #             names[fn] = [col.column_name for col in cols]
-    #     return names
-    
     
 
 class DataFrameNode(QtWidgets.QTreeWidgetItem):
     """ A dataframe node, with multiple column names as sub-node,
         column sub-node's child is customs style widgets
     """
-    # signal_column_renamed = QtCore.pyqtSignal(tuple) # (fn, oldName, newName) 
-    # signal_active_style_changed = QtCore.pyqtSignal() 
-    
-    def __init__(self, datafn, columnNames, parent:DataFrameTree,
-                 # activeStyleChangedCallback=None,  # f()
-                 # columnRenamedCallback=None  # f()
-                 ):
+    def __init__(self, datafn, columnNames, parent:DataFrameTree):
         assert parent is not None
         super().__init__(parent)
-        # self._cbk_any_style_changed = anyStyleChangedCallback # callback if any one of the columns style changed
-        # self._cbk_active_style_changed = activeStyleChangedCallback # callback if the active/selected columns style changed
         self._hash = hash(datafn) # constant
         self.datafile = datafn
         self.dfname = os.path.basename(datafn) # can be renamed by user
@@ -206,21 +173,11 @@ class DataFrameNode(QtWidgets.QTreeWidgetItem):
     
     def getSelectedColumns(self):
         return [col for col in self.column_nodes if col.isSelected()]
-        
-    # def getSelectedColumnNames(self):
-    #     return [col.column_name for col in self.column_nodes if col.isSelected()] 
-    
-    
-    # def getUserStyles(self, col:str):
-    #     return self.column_user_styles[col]
     
     
 
 class DataColumnNode(QtWidgets.QTreeWidgetItem):
     """A column name node, and its style modifier """
-    # signal_renamed = QtCore.pyqtSignal(tuple) # (oldName, newName)
-    # signal_selected_and_style_changed = QtCore.pyqtSignal()
-    
     def __init__(self, colname, parent:DataFrameNode):
         assert parent is not None
         super().__init__(parent)
@@ -245,7 +202,6 @@ class DataColumnNode(QtWidgets.QTreeWidgetItem):
     
     def setData(self, column, role, newName):
         """override parent text edit function to send both old and new names"""
-        # if newName!=oldName:
         super().setData(column, role, newName)
         oldName = self.column_name
         if role == Qt.EditRole and newName!=oldName:
