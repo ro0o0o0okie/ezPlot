@@ -171,7 +171,7 @@ class EzPlot(QtWidgets.QMainWindow):
         self.panel_loader.setLayout(grid)
     
     
-    def updateXAxisNames(self, colNames:set):
+    def updateXAxisNames(self, colNames):
         """update the common x-axis names for editor_x_axis, keep currently selected if possible"""
         xSelected = self.editor_x_axis.getValue()
         if xSelected not in colNames:
@@ -186,26 +186,11 @@ class EzPlot(QtWidgets.QMainWindow):
         # rename df columns
         df.rename(columns={oldName:newName}, inplace=True)
         # update x-axis to current common names
-        commonNames = set( name for df in self.dataframes.values() for name in df.columns )
+        # commonNames = [*self.editor_x_axis.textList]
+        # if oldName in commonNames:
+        #     commonNames.remove(oldName)
+        commonNames = set.intersection(*[set(df.columns) for df in self.dataframes.values()])
         self.updateXAxisNames(commonNames)
-        # if commonNames:
-        # xSelected = self.editor_x_axis.getValue()
-        # if xSelected not in commonNames:
-        #     xSelected = None
-        # self.editor_x_axis.resetItems(list(commonNames), default=xSelected)
-        
-        # # if self.editor_x_axis.count()>0:
-        # xidx = self.editor_x_axis.currentIndex()
-        # colNames = df.columns.tolist()
-        # self.editor_x_axis.resetItems(textList=colNames, default=colNames[xidx])
-        # 
-        # if self.dataframes:
-        #     # rename df columns
-        #     self.dataframe.rename(columns={oldItemText: newItemText}, inplace=True)
-        #     # update x axis combo items
-        #     xidx = self.editor_x_axis.currentIndex()
-        #     colNames = self.dataframe.columns.tolist()
-        #     self.editor_x_axis.resetItems(textList=colNames, default=colNames[xidx])
     
 
     def loadFile(self):
@@ -225,19 +210,20 @@ class EzPlot(QtWidgets.QMainWindow):
             else:
                 df.reset_index(level=None, inplace=True) # in case the header column does not math data column number
                 df.columns = df.columns.str.strip() # strip column names
+                reload = fn in self.dataframes
                 self.dataframes[fn] = df
                 colNames = df.columns.tolist()
                 # update y-axis dfTree
                 self.editor_y_axis.addDataFrame(datafn=fn, columns=colNames)
-                # dfnode.signal_column_renamed.connect(self.onColumnRenamed)
-                # dfnode.signal_active_style_changed.connect(self.plot)
                 # update x-axis common columns
-                if self.editor_x_axis.count()>0:
-                    commonNames = {*colNames, *self.editor_x_axis.textList}
+                if self.editor_x_axis.count()>0 and not reload:
+                    commonNames =  set(colNames).intersection(self.editor_x_axis.textList)   #{*colNames, *self.editor_x_axis.textList}
                     self.updateXAxisNames(commonNames)
                 else: # x-axis empty 
-                    if len(self.dataframes)==1: # first load
-                        self.editor_x_axis.resetItems(colNames, default=colNames[0])
+                    if len(self.dataframes)==1: # first load or reload
+                        # keep the selected x if reload
+                        xSelected = self.editor_x_axis.getValue() if reload else colNames[0]
+                        self.editor_x_axis.resetItems(colNames, default=xSelected)
                     else: # >1, empty due to no common
                         pass # keep empty
         
@@ -247,7 +233,7 @@ class EzPlot(QtWidgets.QMainWindow):
 
     
     def createFigurePanel(self):
-        ''' create matplotlib figure panel '''
+        """ create matplotlib figure panel """
         self.panel_figure = QtWidgets.QWidget()
         
         # Create the mpl Figure and FigCanvas objects.
@@ -328,10 +314,6 @@ class EzPlot(QtWidgets.QMainWindow):
     def plot(self):
         """ Redraws the figure
         """
-        # if self.dataframes is None or len(self.selected_y_cols)==0:
-        #     self.statusBar().showMessage('Nothing to plot', 2000)
-        # else:
-        
         def colNamesFormColNodes(colNodes, excludeName=None):
             if excludeName:
                 return [col.column_name for col in colNodes if col.column_name!=excludeName]
@@ -339,6 +321,9 @@ class EzPlot(QtWidgets.QMainWindow):
                 return [col.column_name for col in colNodes]
         
         xSelectedName = self.editor_x_axis.getValue() # selected x-axis column name
+        if xSelectedName is None:
+            return 
+        
         ySelectedNodes = self.editor_y_axis.getSelectedColumns() # fn => [selected column nodes]
         ySelectedNames = {} # fn => [selected y-axis column names]
         for fn, nodes in ySelectedNodes.items():

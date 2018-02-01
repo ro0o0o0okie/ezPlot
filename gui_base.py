@@ -623,11 +623,17 @@ class ComboBox(QComboBox):
 
     def getValue(self):
         """ return current selected value.  """
-        return self.valueList[self.currentIndex()]
+        if self.valueList:
+            return self.valueList[self.currentIndex()]
+        else:
+            return None
 
     def getText(self):
         """ return current selected text. """
-        return self.textList[self.currentIndex()]
+        if self.textList:
+            return self.textList[self.currentIndex()]
+        else:
+            return None
 
     def enable(self, bool):
         self.setEnabled(bool)

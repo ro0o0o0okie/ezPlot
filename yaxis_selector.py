@@ -81,7 +81,7 @@ class StyleModifier(QtWidgets.QWidget):
         self.editor_line_width_offset = gui.Float(      
             label='LineWidth(+/-)', 
             low=-50, high=50, step=0.1, 
-            default=self.style.line_width_offset, digits=2)
+            default=self.style.line_width_offset, digits=1)
         self.editor_marker = gui.ComboBox(   
             label='Marker',
             textList=['', 'o','>','<', 'v','^', 's', 'D', 'd', 'h','H'], 
@@ -89,7 +89,7 @@ class StyleModifier(QtWidgets.QWidget):
         self.editor_marker_size_offset = gui.Float(      
             label='MarkerSize(+/-)', 
             low=-50, high=50, step=0.2, 
-            default=self.style.marker_size_offset, digits=2)
+            default=self.style.marker_size_offset, digits=1)
         
         self.editor_line_style.currentIndexChanged.connect(self.valueModified)
         self.editor_line_width_offset.valueChanged.connect(self.valueModified)
@@ -189,40 +189,8 @@ class DataFrameNode(QtWidgets.QTreeWidgetItem):
         self.tree.addTopLevelItem(self)
         self.setFlags(Qt.ItemIsEnabled) #| Qt.ItemIsEditable)
         
-        # self.column_names = columns
-        # self.column_user_styles = { c : UserDefinedStyle() for c in columns } # columnName => userStyleObj
         self.column_nodes = [ DataColumnNode(colname=cn, parent=self) for cn in columnNames ] 
-        # for col in self.column_nodes:
-        #     print(col.signal_renamed, type(col.signal_renamed))
-        #     col.signal_renamed.connect(self.onColumnRenamed)
-        #     col.signal_selected_and_style_changed.connect(self.onActiveStyleChanged)
         
-        # for colname, usrsty in self.column_user_styles.items():
-        #     col = self.column_items[colname] = QtWidgets.QTreeWidgetItem(self)
-        #     col.setText(0, colname)
-        #     col.setFlags(Qt.ItemIsEnabled | Qt.ItemIsEditable | Qt.ItemIsSelectable)
-        #     # col.
-        #     styleModifier = QtWidgets.QTreeWidgetItem(col)
-        #     styleModifier.setFlags(Qt.ItemIsEnabled) # not selectable
-        #     # styleModifier.parent().isSelected()
-        #     modifier = StyleModifier(colName=colname, connectFunc=self.onStyleChanged) # self.makeStyleModifierWidget(callback=styleChangedCallback)
-        #     self.tree.setItemWidget(styleModifier, 0, modifier)
-    
-    # @pyqtSlot(tuple) # (oldName, newName)
-    # def onColumnRenamed(self, names:tuple):
-    #     self.signal_column_renamed.emit((self.datafile, *names))
-    # 
-    # @pyqtSlot()
-    # def onActiveStyleChanged(self):
-    #     self.signal_active_style_changed.emit()
-        
-    # def onStyleChanged(self, colname:str):
-    #     # if self._cbk_any_style_changed:
-    #     #     self._cbk_any_style_changed(colname)
-    #     if self._cbk_active_style_changed:
-    #         if self.column_items[colname].isSelected():
-    #             self._cbk_active_style_changed(colname)
-    
     def __hash__(self):
         return self._hash
     
@@ -230,8 +198,11 @@ class DataFrameNode(QtWidgets.QTreeWidgetItem):
         for c in self.column_nodes:
             self.removeChild(c)
         self.column_nodes.clear()
-        self.column_nodes = [ DataColumnNode(colname=cn, parent=self) for cn in columnNames ] 
+        self.column_nodes = [ DataColumnNode(colname=cn, parent=self) for cn in columnNames ]
         
+    
+    def getColumnNamesSet(self):
+        return { col.column_name for col in self.column_nodes }
     
     def getSelectedColumns(self):
         return [col for col in self.column_nodes if col.isSelected()]
@@ -278,8 +249,11 @@ class DataColumnNode(QtWidgets.QTreeWidgetItem):
         super().setData(column, role, newName)
         oldName = self.column_name
         if role == Qt.EditRole and newName!=oldName:
-            self.column_name = newName
-            self.tree.signal_column_renamed.emit((self.dfnode.datafile, oldName, newName))
+            if newName and newName not in self.dfnode.getColumnNamesSet():
+                self.column_name = newName
+                self.tree.signal_column_renamed.emit((self.dfnode.datafile, oldName, newName))
+            else: # blank/duplicate new name is not allowed
+                super().setData(column, role, oldName) # revert
             
     
     def getStyle(self):
