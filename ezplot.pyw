@@ -13,7 +13,9 @@ import warnings
 import pandas as pd
 import matplotlib as plt
 import qdarkstyle
+from collections import OrderedDict, defaultdict
 
+from PyQt5.QtCore import pyqtSlot
 from matplotlib import style, colors
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -21,31 +23,34 @@ from matplotlib.figure import Figure
 from PyQt5 import QtCore, QtWidgets, QtGui
 
 import gui_base as gui
-
+from yaxis_selector import DataFrameTree
 
 __appname__ = 'EzPlot'
-__version__ = "2.0.0"
+__version__ = "3.0.1802"
 __author__  = 'RayN'
 __config__ = os.path.join(os.path.dirname(__file__), 'config.json')
 
 
-def GetPlotSyles():
+def GetPlotThemeSyles():
     return ['default', 'classic'] + sorted(
         style for style in plt.style.available if style != 'classic')
         
 
 class EzPlot(QtWidgets.QMainWindow):
+    
+    # default config
+    config = {
+        'WindowSize' : (1200, 800),
+        'SplitterState' : None,
+        'DataFile' : os.path.dirname(__file__),
+        'Style' : 'default',
+        'FigWidth' : 5, 'FigHeight' : 4, 
+        'FlagClear' : True, 'FlagGrid' : True, 'FlagLegend' : True,
+        'FontSize' : 11,
+    }
+    
     def __init__(self, config:dict=None):
         super(EzPlot, self).__init__()
-        self.config = {
-            'WindowSize' : (1200, 800),
-            'SplitterState' : None,
-            'DataFile' : os.path.dirname(__file__),
-            'Style' : 'default',
-            'FigWidth' : 5, 'FigHeight' : 4, 
-            'FlagClear' : True, 'FlagGrid' : True, 'FlagLegend' : True,
-            'FontSize' : 11,
-        }
         if config:
             self.config.update(config)
         
@@ -54,7 +59,11 @@ class EzPlot(QtWidgets.QMainWindow):
         self.resize(*self.config['WindowSize'])
         self.center()
         
-        self.dataframe = None # init dataFrame
+        # self.dataframe = None # init dataFrame
+        self.dataframes = OrderedDict() # fn => df
+        # self.selected_x_col = None      # selected x-axis column name
+        # self.selected_y_col_names = {}  # fn => [selected y-axis column nodes]
+        # self.selected_y_col_nodes = {}  # fn => [selected y-axis column names]
         
         self.createMenu()
         self.createLoaderPanel()
@@ -82,7 +91,7 @@ class EzPlot(QtWidgets.QMainWindow):
         self.config = {
             'WindowSize'    : (self.frameGeometry().width(), self.frameGeometry().height()),
             'SplitterState' : str(self.main_frame.saveState().toHex(), encoding='ascii'),
-            'DataFile'      : self.datafile.getValue(),
+            'DataFile'      : self.editor_datafile.getValue(),
             'Style'         : self.combo_style.getValue(),
             'FigWidth'      : self.editor_fig_width.getValue(), 
             'FigHeight'     : self.editor_fig_height.getValue(), 
@@ -127,23 +136,28 @@ class EzPlot(QtWidgets.QMainWindow):
 
 
     def createLoaderPanel(self):
-        ''' create data file loader panel '''
+        """create data file loader panel """
         self.panel_loader = QtWidgets.QWidget()
-        self.datafile = gui.File(label="Data", default=None, 
-                                 dlgDir=os.path.dirname(self.config['DataFile']), 
-                                 minWidth=120, callbackFunc=self.loadFile)
-        self.editor_x_axis = gui.ComboBox(textList=[], label='X Axis', connectFunc=self.updatePlot)
-        self.editor_y_axis = gui.List(items=[], multiple=True, label="Y Axis", editable=True, 
-                                      connectFunc=self.updatePlot, editCallbackFunc=self.onColumnLabelChanged)
+        self.editor_datafile = gui.File(label="Data", default=None,
+                                        dlgDir=os.path.dirname(self.config['DataFile']),
+                                        minWidth=120, callbackFunc=self.loadFile)
+        self.editor_x_axis = gui.ComboBox(textList=[], label='X Axis', connectFunc=self.plot)
+        # self.editor_y_axis_ = gui.List(items=[], multiple=True, label="Y Axis", editable=True,
+        #                                connectFunc=self.updatePlot, editCallbackFunc=self.onColumnRenamed)
+        self.editor_y_axis = DataFrameTree(parent=self,label='Y Axis')
+        self.editor_y_axis.itemSelectionChanged.connect(self.plot)
+        self.editor_y_axis.signal_column_renamed.connect(self.onColumnRenamed)
+        self.editor_y_axis.signal_active_style_changed.connect(self.plot)
+        
         self.editor_legend = gui.Text(default=None, label='Legend',
                                       tooltip='multiple labels can be seperated by comma')
         self.editor_legend.editingFinished.connect(self.setCustomLegend)
 
         grid = QtWidgets.QGridLayout()
         grid.setSpacing(10)
-        grid.addWidget(self.datafile.labelText, 1, 0)
-        grid.addWidget(self.datafile.text, 1, 1)
-        grid.addWidget(self.datafile.button, 1, 2)
+        grid.addWidget(self.editor_datafile.labelText, 1, 0)
+        grid.addWidget(self.editor_datafile.text, 1, 1)
+        grid.addWidget(self.editor_datafile.button, 1, 2)
 
         grid.addWidget(self.editor_x_axis.labelText, 2, 0)
         grid.addWidget(self.editor_x_axis, 2, 1, 1, 2)
@@ -157,19 +171,46 @@ class EzPlot(QtWidgets.QMainWindow):
         self.panel_loader.setLayout(grid)
     
     
-    def onColumnLabelChanged(self, newItemText:str, oldItemText:str):
-        if self.dataframe is not None:
-            # rename df columns
-            self.dataframe.rename(columns={oldItemText: newItemText}, inplace=True)
-            # update x axis combo items
-            xidx = self.editor_x_axis.currentIndex()
-            colNames = self.dataframe.columns.tolist()
-            self.editor_x_axis.resetItems(textList=colNames, default=colNames[xidx])
+    def updateXAxisNames(self, colNames:set):
+        """update the common x-axis names for editor_x_axis, keep currently selected if possible"""
+        xSelected = self.editor_x_axis.getValue()
+        if xSelected not in colNames:
+            xSelected = None
+        self.editor_x_axis.resetItems(sorted(colNames), default=xSelected)
+    
+    
+    @pyqtSlot(tuple) #  (fn, oldName, newName) 
+    def onColumnRenamed(self, names:tuple):
+        fn, oldName, newName = names
+        df = self.dataframes[fn] 
+        # rename df columns
+        df.rename(columns={oldName:newName}, inplace=True)
+        # update x-axis to current common names
+        commonNames = set( name for df in self.dataframes.values() for name in df.columns )
+        self.updateXAxisNames(commonNames)
+        # if commonNames:
+        # xSelected = self.editor_x_axis.getValue()
+        # if xSelected not in commonNames:
+        #     xSelected = None
+        # self.editor_x_axis.resetItems(list(commonNames), default=xSelected)
+        
+        # # if self.editor_x_axis.count()>0:
+        # xidx = self.editor_x_axis.currentIndex()
+        # colNames = df.columns.tolist()
+        # self.editor_x_axis.resetItems(textList=colNames, default=colNames[xidx])
+        # 
+        # if self.dataframes:
+        #     # rename df columns
+        #     self.dataframe.rename(columns={oldItemText: newItemText}, inplace=True)
+        #     # update x axis combo items
+        #     xidx = self.editor_x_axis.currentIndex()
+        #     colNames = self.dataframe.columns.tolist()
+        #     self.editor_x_axis.resetItems(textList=colNames, default=colNames[xidx])
     
 
     def loadFile(self):
         """ load data into dataFrame """
-        fn = self.datafile.getValue()
+        fn = os.path.abspath(self.editor_datafile.getValue())
         if os.path.isfile(fn):
             df = None
             for readfunc in (pd.read_csv, pd.read_excel, pd.read_pickle, pd.read_table):
@@ -182,11 +223,24 @@ class EzPlot(QtWidgets.QMainWindow):
             if df is None or df.empty:
                 self.statusBar().showMessage('Read data file failed! (supported formats: CSV, Pickle, Excel)', 8000)
             else:
-                df.reset_index(level=None, inplace=True)
-                self.dataframe = df
+                df.reset_index(level=None, inplace=True) # in case the header column does not math data column number
+                df.columns = df.columns.str.strip() # strip column names
+                self.dataframes[fn] = df
                 colNames = df.columns.tolist()
-                self.editor_y_axis.resetItems(colNames)
-                self.editor_x_axis.resetItems(colNames, default=colNames[0])
+                # update y-axis dfTree
+                self.editor_y_axis.addDataFrame(datafn=fn, columns=colNames)
+                # dfnode.signal_column_renamed.connect(self.onColumnRenamed)
+                # dfnode.signal_active_style_changed.connect(self.plot)
+                # update x-axis common columns
+                if self.editor_x_axis.count()>0:
+                    commonNames = {*colNames, *self.editor_x_axis.textList}
+                    self.updateXAxisNames(commonNames)
+                else: # x-axis empty 
+                    if len(self.dataframes)==1: # first load
+                        self.editor_x_axis.resetItems(colNames, default=colNames[0])
+                    else: # >1, empty due to no common
+                        pass # keep empty
+        
                 self.statusBar().showMessage('Data loaded successfully.', 5000)
         else:
             self.statusBar().showMessage('File does not exist', 5000)
@@ -208,7 +262,7 @@ class EzPlot(QtWidgets.QMainWindow):
         toolbar = NavigationToolbar(self.canvas, self.panel_figure)
 
         # figure control widgets
-        self.botton_draw = gui.MakePushButton('Plot', minWidth=120, clickFunc=self.updatePlot)
+        self.botton_draw = gui.MakePushButton('Plot', minWidth=120, clickFunc=self.plot)
         self.chkbox_clear = gui.CheckBox(default=self.config['FlagClear'], label='Clear')
         self.chkbox_grid = gui.CheckBox(default=self.config['FlagGrid'], label='Grid')
         self.chkbox_legend = gui.CheckBox(default=self.config['FlagLegend'], label='Legend')
@@ -219,10 +273,10 @@ class EzPlot(QtWidgets.QMainWindow):
         self.editor_skip = gui.Int(low=0, high=100, step=1, default=0, label='DataSkip', tooltip='plot every nth data row')
         self.editor_skip.valueChanged.connect(self.plot)
         
-        styles = GetPlotSyles()
+        styles = GetPlotThemeSyles()
         self.combo_style = gui.ComboBox(textList=styles, valueList=styles, label='Style',
                                         default=self.config['Style'],
-                                        connectFunc=self.onStyleChanged)
+                                        connectFunc=self.applyThemeStyle)
         
         hbox1 = gui.MakeHBoxLayout([
             gui.MakeHBoxLayout([self.combo_style.labelText, self.combo_style]),
@@ -239,14 +293,11 @@ class EzPlot(QtWidgets.QMainWindow):
         self.panel_figure.setLayout(vbox)
     
 
-    def updatePlot(self):
-        self.selected_x_col = self.editor_x_axis.getValue()
-        self.selected_y_cols = self.editor_y_axis.getValue() 
-        try: # draw x v.s x is not allowed
-            self.selected_y_cols.remove(self.selected_x_col)
-        except ValueError:
-            pass
-        self.plot()
+    # def updatePlot(self):
+    #     self.selected_x_col = self.editor_x_axis.getValue()
+    #     # self.selected_y_cols = self.editor_y_axis.getValue() 
+    #     self.selected_y_cols = self.editor_y_axis.getSelectedColumnNames(excludeName=self.selected_x_col)
+    #     self.plot()
 
     
     def setEditorFigureSize(self, w, h):
@@ -254,7 +305,7 @@ class EzPlot(QtWidgets.QMainWindow):
         self.editor_fig_height.setValue(h)
         
     
-    def onStyleChanged(self):
+    def applyThemeStyle(self):
         style.use('default')
         style.use(self.combo_style.getValue())
         self.fig.patch.set_facecolor(plt.rcParams['figure.facecolor'])
@@ -262,14 +313,40 @@ class EzPlot(QtWidgets.QMainWindow):
         self.fig.set_edgecolor(plt.rcParams['figure.edgecolor'])
         self.axes.set_facecolor(plt.rcParams['axes.facecolor'])
         self.plot()
-        
+    
+    
+    # def getColumnNamesFromNodes(self, columnNodes:dict, excludeName=None):
+    #     names = {} # fn => [selected column names]
+    #     for fn, cols in columnNodes.items():
+    #         if excludeName:
+    #             names[fn] = [col.column_name for col in cols if cols.column_name!=excludeName]
+    #         else:
+    #             names[fn] = [col.column_name for col in cols]
+    #     return names
+    
     
     def plot(self):
         """ Redraws the figure
         """
-        if self.dataframe is None or len(self.selected_y_cols)==0:
-            self.statusBar().showMessage('Nothing to plot', 2000)
-        else:
+        # if self.dataframes is None or len(self.selected_y_cols)==0:
+        #     self.statusBar().showMessage('Nothing to plot', 2000)
+        # else:
+        
+        def colNamesFormColNodes(colNodes, excludeName=None):
+            if excludeName:
+                return [col.column_name for col in colNodes if col.column_name!=excludeName]
+            else:
+                return [col.column_name for col in colNodes]
+        
+        xSelectedName = self.editor_x_axis.getValue() # selected x-axis column name
+        ySelectedNodes = self.editor_y_axis.getSelectedColumns() # fn => [selected column nodes]
+        ySelectedNames = {} # fn => [selected y-axis column names]
+        for fn, nodes in ySelectedNodes.items():
+            names = colNamesFormColNodes(nodes, excludeName=xSelectedName) 
+            if names:
+                ySelectedNames[fn] = names
+                
+        if self.dataframes and ySelectedNames:
             if self.chkbox_clear.isChecked(): # clear the axes and redraw the plot anew
                 self.axes.clear()
             
@@ -283,41 +360,48 @@ class EzPlot(QtWidgets.QMainWindow):
             
             fontSz = self.editor_fontsz.getValue()
             legnON = self.chkbox_legend.getValue()
-            skip = self.editor_skip.getValue()
+            gridON = self.chkbox_grid.isChecked()
+            rowSkip = self.editor_skip.getValue()
             
-            df = self.dataframe if skip==0 else self.dataframe.iloc[::skip, :]
-            ax = df.plot(x=self.selected_x_col, 
-                         y=self.selected_y_cols,
-                         ax=self.axes,
-                         fontsize=fontSz,
-                         grid=self.chkbox_grid.isChecked(),
-                         legend=legnON)
-            # ax.patch.set_alpha(0)
-            
-            # # apply individual user-custom styles
-            # for col in self.selected_y_cols:
-            #     usersty = self.editor_y_axis.getUserStyle(col) # return None if use default
-            #     if bool(usersty):
-            #         for line in ax.get_lines():
-            #             if line.get_label() == col:
-            #                 usersty.apply(line)
-                        
-                    
+            for fn, ys in ySelectedNames.items():
+                lineSet = set(self.axes.get_lines())
+                df = self.dataframes[fn]
+                if rowSkip>0:
+                     df = df.iloc[::rowSkip, :]
+                ax = df.plot(x=xSelectedName, 
+                             y=ys,
+                             ax=self.axes,
+                             fontsize=fontSz,
+                             grid=gridON,
+                             legend=legnON)
+                
+                # apply individual user-custom styles (to newly plotted lines)
+                newLines = set(ax.get_lines()) - lineSet # this avoid apply style to lines with same label
+                for colNode in ySelectedNodes[fn]:
+                    usersty = colNode.getStyle()
+                    if usersty: # will be True if non-default
+                        for line in newLines:
+                            if line.get_label() == colNode.column_name:
+                                usersty.apply(line)
+                                break
+        
             # axis label font size
-            for item in [ax.title, ax.xaxis.label, ax.yaxis.label]:
+            for item in [self.axes.title, self.axes.xaxis.label, self.axes.yaxis.label]:
                 item.set_fontsize(fontSz)
             
             if legnON: # legend font & transparency
-                ax.legend(borderpad=0.2, labelspacing=0.2, framealpha=0.8, fontsize=fontSz)
-                legn = ax.get_legend()
+                self.axes.legend(borderpad=0.2, labelspacing=0.2, framealpha=0.8, fontsize=fontSz)
+                legn = self.axes.get_legend()
                 if legn is not None: 
-                    self.setCustomLegend()
+                    self.setCustomLegend(canvasDraw=False)
                     legn.draggable(True)
+        
+            self.canvas.draw()
+            
+        else:
+            self.statusBar().showMessage('Nothing to plot', 2000)
 
-        self.canvas.draw()
-
-
-    def setCustomLegend(self):
+    def setCustomLegend(self, canvasDraw=True):
         ''' set legend from custom input text, seperated by comma'''
         legnStr = self.editor_legend.getValue()
         if legnStr:
@@ -325,7 +409,8 @@ class EzPlot(QtWidgets.QMainWindow):
             if legn is not None:
                 for lt, ls in zip(legn.get_texts(), legnStr.split(',')):
                     lt.set_text(ls)
-                self.canvas.draw_idle() # refresh
+                if canvasDraw:
+                    self.canvas.draw_idle() # refresh
 
 
     def savePlot(self):
