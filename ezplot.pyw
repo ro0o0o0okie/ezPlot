@@ -148,7 +148,8 @@ class EzPlot(QtWidgets.QMainWindow):
         self.editor_y_axis.signal_dataframe_deleted.connect(self.onDataFrameDeleted)
         self.editor_y_axis.signal_dataframe_reload.connect(self.onDataFrameReload)
         
-        self.editor_legend = gui.Text(default=None, label='Legend',
+        self.editor_ytitle = gui.Text(default=None, label='Y Title')        
+        self.editor_legend = gui.Text(default=None, label='Legend', 
                                       tooltip='multiple labels can be seperated by comma')
         self.editor_legend.editingFinished.connect(self.setCustomLegend)
 
@@ -163,9 +164,12 @@ class EzPlot(QtWidgets.QMainWindow):
 
         grid.addWidget(self.editor_y_axis.labelText, 3, 0)
         grid.addWidget(self.editor_y_axis, 3, 1, 4, 2)
-
-        grid.addWidget(self.editor_legend.labelText, 7, 0)
-        grid.addWidget(self.editor_legend, 7, 1, 1, 2)
+        
+        grid.addWidget(self.editor_ytitle.labelText, 7, 0)
+        grid.addWidget(self.editor_ytitle, 7, 1, 1, 2)
+        
+        grid.addWidget(self.editor_legend.labelText, 8, 0)
+        grid.addWidget(self.editor_legend, 8, 1, 1, 2)
 
         self.panel_loader.setLayout(grid)
     
@@ -364,6 +368,11 @@ class EzPlot(QtWidgets.QMainWindow):
                                 usersty.apply(line)
                                 break
         
+            # axis label
+            ylabel = self.editor_ytitle.getValue()
+            if ylabel:
+                self.axes.set_ylabel(ylabel) 
+            
             # axis label font size
             for item in [self.axes.title, self.axes.xaxis.label, self.axes.yaxis.label]:
                 item.set_fontsize(fontSz)
@@ -392,13 +401,13 @@ class EzPlot(QtWidgets.QMainWindow):
                     self.canvas.draw_idle() # refresh
 
 
-    def savePlot(self):
-        path = str(QtWidgets.QFileDialog.getSaveFileName(self, 'Save Image', '',
-                                                   "Image files (*.png *.eps *.pdf *.jpg *.tif *.tiff)"))
-        if path:
-            # self.canvas.print_figure(path, dpi=300, transparent=True)
-            self.fig.savefig(path, dpi=300, bbox_inches='tight', transparent=True, pad_inches=0.2)
-            self.statusBar().showMessage('Saved to %s' % path, 2000)
+    # def savePlot(self):
+    #     path = str(QtWidgets.QFileDialog.getSaveFileName(self, 'Save Image', '',
+    #                                                "Image files (*.png *.eps *.pdf *.jpg *.tif *.tiff)"))
+    #     if path:
+    #         # self.canvas.print_figure(path, dpi=300, transparent=True)
+    #         self.fig.savefig(path, dpi=300, bbox_inches='tight', transparent=True, pad_inches=0.2)
+    #         self.statusBar().showMessage('Saved to %s' % path, 2000)
 
     
     def createMenu(self):
@@ -411,11 +420,12 @@ class EzPlot(QtWidgets.QMainWindow):
                     target.addAction(action)
                 
         fileMenu = self.menuBar().addMenu("&File")
-        action_save = self.createAction("&Save plot",
-                                        slot=self.savePlot, shortcut="Ctrl+S", tip="Save the plot")
+        # action_save = self.createAction("&Save plot",
+        #                                 slot=self.savePlot, shortcut="Ctrl+S", tip="Save the plot")
         action_quit = self.createAction("&Quit", slot=self.close,
                                         shortcut="Ctrl+Q", tip="Close the application")
-        addActions(fileMenu, (action_save, None, action_quit))
+        # addActions(fileMenu, (action_save, None, action_quit))
+        addActions(fileMenu, (None, action_quit))
 
         helpMenu = self.menuBar().addMenu("&Help")
         action_about = self.createAction("&About",
