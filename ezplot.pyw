@@ -223,19 +223,26 @@ class EzPlot(QtWidgets.QMainWindow):
             fn = os.path.abspath(self.editor_datafile.getValue())
         if os.path.isfile(fn):
             df = None
-            for readfunc in (pd.read_csv, pd.read_excel, pd.read_pickle, pd.read_table):
+            tryFuncs = (pd.read_csv, pd.read_excel, pd.read_pickle, pd.read_table)
+            tryFuncArgvs = [
+                {'index_col': False }, # read_csv
+                {}, # read_excel
+                {}, # read_pickle
+                {} # read_table
+            ]
+            for readfunc, argDict in zip(tryFuncs, tryFuncArgvs):
                 try:
-                    df = readfunc(fn)
+                    df = readfunc(fn, **argDict)
                     break 
                 except:
                     pass
-                
+            
             if df is None or df.empty:
                 self.statusBar().showMessage('Read data file failed! (supported formats: CSV, Pickle, Excel)', 8000)
             else:
                 df.reset_index(level=None, inplace=True) # in case the header column does not math data column number
                 df.columns = df.columns.str.strip() # strip column names
-                reload = fn in self.dataframes
+                # print(df)
                 self.dataframes[fn] = df
                 colNames = df.columns.tolist()
                 # update y-axis dfTree
