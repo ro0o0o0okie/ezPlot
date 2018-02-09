@@ -30,6 +30,12 @@ __author__  = 'RayN'
 __config__ = os.path.join(os.path.dirname(__file__), 'config.json')
 
 
+'''
+TODO:
+    + hist & scatter plot : https://elitedatascience.com/python-seaborn-tutorial
+'''
+
+
 def GetPlotThemeSyles():
     return ['default', 'classic'] + sorted(
         style for style in plt.style.available if style != 'classic')
@@ -43,7 +49,7 @@ class EzPlot(QtWidgets.QMainWindow):
         'SplitterState' : None,
         'DataFile' : os.path.dirname(__file__),
         'Style' : 'default',
-        'FigWidth' : 5, 'FigHeight' : 4, 
+        'FigWidth' : 5, 'FigHeight' : 4, 'FigAlpha' : 1.0,
         'FlagClear' : True, 'FlagGrid' : True, 'FlagLegend' : True,
         'FontSize' : 11,
     }
@@ -90,6 +96,7 @@ class EzPlot(QtWidgets.QMainWindow):
             'Style'         : self.combo_style.getValue(),
             'FigWidth'      : self.editor_fig_width.getValue(), 
             'FigHeight'     : self.editor_fig_height.getValue(), 
+            'FigAlpha'      : self.editor_fig_alpha.getValue(), 
             'FlagClear'     : self.chkbox_clear.isChecked(), 
             'FlagGrid'      : self.chkbox_grid.isChecked(), 
             'FlagLegend'    : self.chkbox_legend.isChecked(),
@@ -263,19 +270,29 @@ class EzPlot(QtWidgets.QMainWindow):
         figsize = (self.config['FigWidth'], self.config['FigHeight'])
         
         self.fig = Figure(figsize)
+        self.fig.patch.set_alpha(0.0)
         self.canvas = FigureCanvas(figure=self.fig)
         self.canvas.setParent(self.panel_figure)
+        self.canvas.setStyleSheet("background-color:transparent;")
         self.axes = self.fig.add_subplot(111)
+        
         # Create the navigation toolbar, tied to the canvas
         toolbar = NavigationToolbar(self.canvas, self.panel_figure)
 
         # figure control widgets
         self.botton_draw = gui.MakePushButton('Plot', minWidth=120, clickFunc=self.plot)
+        
         self.chkbox_clear = gui.CheckBox(default=self.config['FlagClear'], label='Clear')
         self.chkbox_grid = gui.CheckBox(default=self.config['FlagGrid'], label='Grid')
         self.chkbox_legend = gui.CheckBox(default=self.config['FlagLegend'], label='Legend')
-        self.editor_fig_width = gui.Float(low=1, high=64, step=0.01, digits=2, default=figsize[0], label="FigWidth")
-        self.editor_fig_height = gui.Float(low=1, high=64, step=0.01, digits=2, default=figsize[1], label="FigHeight")
+        
+        self.editor_fig_width  = gui.Float(label="W", tooltip='figure width',
+                                           low=1, high=64, step=0.01, digits=2, default=figsize[0])
+        self.editor_fig_height = gui.Float(label="H", tooltip='figure height',
+                                           low=1, high=64, step=0.01, digits=2, default=figsize[1])
+        self.editor_fig_alpha  = gui.Float(label="Alpha", tooltip='figure background alpha', 
+                                           low=0, high=1, step=0.1, digits=1, default=self.config['FigAlpha'])
+        
         self.editor_fontsz = gui.Float(low=6, high=64, step=1.0, digits=1, default=self.config['FontSize'], label="FontSize")
         self.editor_fontsz.valueChanged.connect(self.plot)
         self.editor_skip = gui.Int(low=0, high=100, step=1, default=0, label='DataSkip', tooltip='plot every nth data row')
@@ -289,7 +306,8 @@ class EzPlot(QtWidgets.QMainWindow):
         hbox1 = gui.MakeHBoxLayout([
             gui.MakeHBoxLayout([self.combo_style.labelText, self.combo_style]),
             gui.MakeHBoxLayout([self.editor_fig_width.labelText, self.editor_fig_width]),
-            gui.MakeHBoxLayout([self.editor_fig_height.labelText, self.editor_fig_height])
+            gui.MakeHBoxLayout([self.editor_fig_height.labelText, self.editor_fig_height]),
+            gui.MakeHBoxLayout([self.editor_fig_alpha.labelText, self.editor_fig_alpha])
         ])
         hbox2 = gui.MakeHBoxLayout([
             self.botton_draw, 
@@ -309,10 +327,10 @@ class EzPlot(QtWidgets.QMainWindow):
     def applyThemeStyle(self):
         style.use('default')
         style.use(self.combo_style.getValue())
-        self.fig.patch.set_facecolor(plt.rcParams['figure.facecolor'])
-        self.fig.set_edgecolor(plt.rcParams['figure.facecolor'])
+        self.fig.set_facecolor(plt.rcParams['figure.facecolor'])
         self.fig.set_edgecolor(plt.rcParams['figure.edgecolor'])
         self.axes.set_facecolor(plt.rcParams['axes.facecolor'])
+        # self.fig.patch.set_facecolor(plt.rcParams['figure.facecolor'])
         self.plot()
     
     
@@ -379,6 +397,9 @@ class EzPlot(QtWidgets.QMainWindow):
             ylabel = self.editor_ytitle.getValue()
             if ylabel:
                 self.axes.set_ylabel(ylabel) 
+                
+            # axis alpha
+            self.axes.patch.set_alpha(self.editor_fig_alpha.getValue())
             
             # axis label font size
             for item in [self.axes.title, self.axes.xaxis.label, self.axes.yaxis.label]:
