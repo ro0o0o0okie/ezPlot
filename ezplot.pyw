@@ -69,6 +69,7 @@ class EzPlot(QtWidgets.QMainWindow):
         self.createMenu()
         self.createLoaderPanel()
         self.createFigurePanel()
+        self.applyPlotStyle()
 
         self.main_frame = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         self.main_frame.addWidget(self.panel_loader)
@@ -301,7 +302,7 @@ class EzPlot(QtWidgets.QMainWindow):
         styles = GetPlotThemeSyles()
         self.combo_style = gui.ComboBox(textList=styles, valueList=styles, label='Style',
                                         default=self.config['Style'],
-                                        connectFunc=self.applyThemeStyle)
+                                        connectFunc=self.applyPlotStyle)
         
         hbox1 = gui.MakeHBoxLayout([
             gui.MakeHBoxLayout([self.combo_style.labelText, self.combo_style]),
@@ -324,13 +325,18 @@ class EzPlot(QtWidgets.QMainWindow):
         self.editor_fig_height.setValue(h)
         
     
-    def applyThemeStyle(self):
-        style.use('default')
+    def applyPlotStyle(self):
+        plt.rcdefaults()
         style.use(self.combo_style.getValue())
         self.fig.set_facecolor(plt.rcParams['figure.facecolor'])
         self.fig.set_edgecolor(plt.rcParams['figure.edgecolor'])
         self.axes.set_facecolor(plt.rcParams['axes.facecolor'])
-        # self.fig.patch.set_facecolor(plt.rcParams['figure.facecolor'])
+        
+        for axsp in self.axes.spines.values():
+            axsp.set_edgecolor(plt.rcParams['axes.edgecolor'])
+            axsp.set_linewidth(1.0)
+            axsp.set_alpha(1.0)
+
         self.plot()
     
     
@@ -393,6 +399,10 @@ class EzPlot(QtWidgets.QMainWindow):
                                 usersty.apply(line)
                                 break
         
+            # axis grid
+            if gridON:
+                self.axes.grid(linestyle='--')
+            
             # axis label
             ylabel = self.editor_ytitle.getValue()
             if ylabel:
