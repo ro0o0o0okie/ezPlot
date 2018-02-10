@@ -156,7 +156,8 @@ class EzPlot(QtWidgets.QMainWindow):
         self.editor_y_axis.signal_dataframe_deleted.connect(self.onDataFrameDeleted)
         self.editor_y_axis.signal_dataframe_reload.connect(self.onDataFrameReload)
         
-        self.editor_ytitle = gui.Text(default=None, label='Y Title')        
+        self.editor_ytitle = gui.Text(default=None, label='Y Title')     
+        self.editor_xtitle = gui.Text(default=None, label='X Title')        
         self.editor_legend = gui.Text(default=None, label='Legend', 
                                       tooltip='multiple labels can be seperated by comma')
         self.editor_legend.editingFinished.connect(self.setCustomLegend)
@@ -173,11 +174,13 @@ class EzPlot(QtWidgets.QMainWindow):
         grid.addWidget(self.editor_y_axis.labelText, 3, 0)
         grid.addWidget(self.editor_y_axis, 3, 1, 4, 2)
         
-        grid.addWidget(self.editor_ytitle.labelText, 7, 0)
-        grid.addWidget(self.editor_ytitle, 7, 1, 1, 2)
+        grid.addWidget(self.editor_xtitle.labelText, 7, 0)
+        grid.addWidget(self.editor_xtitle, 7, 1, 1, 2)
+        grid.addWidget(self.editor_ytitle.labelText, 8, 0)
+        grid.addWidget(self.editor_ytitle, 8, 1, 1, 2)
         
-        grid.addWidget(self.editor_legend.labelText, 8, 0)
-        grid.addWidget(self.editor_legend, 8, 1, 1, 2)
+        grid.addWidget(self.editor_legend.labelText, 9, 0)
+        grid.addWidget(self.editor_legend, 9, 1, 1, 2)
 
         self.panel_loader.setLayout(grid)
     
@@ -405,8 +408,12 @@ class EzPlot(QtWidgets.QMainWindow):
             
             # axis label
             ylabel = self.editor_ytitle.getValue()
-            if ylabel:
-                self.axes.set_ylabel(ylabel) 
+            if ylabel: 
+                self.axes.set_ylabel(ylabel)
+            
+            xlabel = self.editor_xtitle.getValue()
+            if xlabel:
+                self.axes.set_xlabel(xlabel)
                 
             # axis alpha
             self.axes.patch.set_alpha(self.editor_fig_alpha.getValue())
