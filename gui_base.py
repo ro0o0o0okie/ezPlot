@@ -876,10 +876,18 @@ class File(QWidget):
     #         QMessageBox.warning(self, "注意", "找不到文件<%s>，请检查输入路径是否正确！"%filePath)
 
     def selectFile(self):
-        if self._dlg_dir and os.path.isdir(self._dlg_dir):
+        curFile = self.getValue()
+        if curFile and os.path.isfile(curFile):
+            curDir = os.path.dirname(curFile)
+        elif self._dlg_dir and os.path.isdir(self._dlg_dir):
             curDir = self._dlg_dir
-        else: # use current date path as default open dir
-            curDir = os.path.dirname(self.getValue()) # split(unicode(self.text.text()))[0]
+        else:
+            curDir = './'
+        
+        # if self._dlg_dir and os.path.isdir(self._dlg_dir):
+        #     curDir = self._dlg_dir
+        # else: # use current date path as default open dir
+        #     curDir = os.path.dirname(self.getValue()) # split(unicode(self.text.text()))[0]
         fileName, _ = QFileDialog.getOpenFileName(self, self._dlg_title, curDir, self._dlg_filter)
         if fileName: # selected
             self.setValue(abspath(fileName))
